@@ -1,0 +1,15 @@
+{
+  "name": "course-management-service",
+  "version": "1.0.0",
+  "description": "MoocFlix: A mooc streaming platform course-management-service is going to be a microservice which is going to carry out these tasks:",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sparsh Prakash",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.7",
+    "prettier": "^3.3.3"
+  }
+}
