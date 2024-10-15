@@ -95,3 +95,31 @@ Our project includes various levels of testing:
 - End-to-End Tests
 
 To run the tests:
+
+bash
+npm run test
+
+
+
+## 🤝 Contributing
+
+We welcome contributions to MoocFlix! Please see our [Contributing Guide](CONTRIBUTING.md) for more details.
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgements
+
+- [Express.js](https://expressjs.com/)
+- [MongoDB](https://www.mongodb.com/)
+- [PostgreSQL](https://www.postgresql.org/)
+- [Apache Kafka](https://kafka.apache.org/)
+- [FFmpeg](https://ffmpeg.org/)
+- [Docker](https://www.docker.com/)
+- [Kubernetes](https://kubernetes.io/)
+
+---
+
+<p align="center">Made with ❤️ by the MoocFlix Team</p>
+
