@@ -95,8 +95,8 @@ Our project includes various levels of testing:
 - End-to-End Tests
 
 To run the tests:
-```
 bash
+```
 npm run test
 ```
 
