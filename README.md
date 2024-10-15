@@ -1,6 +1,6 @@
 # MoocFlix 🎓🎬
 
-![MoocFlix Logo](path/to/your/logo.png)
+![MOOCFLIX (1)](https://github.com/user-attachments/assets/f4966bbc-24e6-4385-834f-bf21bbd8b3f6)
 
 MoocFlix is a cutting-edge MOOC (Massive Open Online Course) streaming platform that combines the power of education with the convenience of modern video streaming services. Built with a microservices architecture, MoocFlix offers a scalable and robust solution for online learning.
 
