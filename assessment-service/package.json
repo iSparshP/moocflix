@@ -1,0 +1,19 @@
+{
+    "name": "assessment-service",
+    "version": "1.0.0",
+    "description": "MoocFlix: A mooc streaming platform assessment-service is going to be a microservice which is going to carry out these tasks: 1. Quiz/Assignment Handling: Manage creation and submission of quizzes and assignments. 2. Auto-Grading: Implement automated grading for quizzes with objective answers and integrate manual grading for subjective assignments().",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "sparsh prakash",
+    "license": "ISC",
+    "dependencies": {
+        "axios": "^1.7.7",
+        "dotenv": "^16.4.5",
+        "express": "^4.21.1",
+        "kafkajs": "^2.2.4",
+        "mongoose": "^8.7.1"
+    }
+}
