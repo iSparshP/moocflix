@@ -1,5 +1,49 @@
-// ignore all these files
-
+# Node.js dependencies
 /node_modules
-.DS_Store
+
+# Environment variables
 .env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Build output
+/dist
+
+# Docker files
+docker-compose.override.yml
+Dockerfile.*
+
+# Prettier files
+.prettierignore
+.prettierrc
+
+# Ignore test coverage reports
+/coverage
+
+# Ignore compiled TypeScript files
+*.tsbuildinfo
+
+# Ignore specific files
+User_kafka_architecture.md
+Readme_Doc.md

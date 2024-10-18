@@ -1,4 +1,5 @@
 const User = require('../models/User.js');
+const { sendMessage } = require('../../config/kafka');
 
 exports.getProfile = async (req, res) => {
     try {
@@ -16,6 +17,10 @@ exports.updateProfile = async (req, res) => {
             req.body,
             { new: true }
         );
+        await sendMessage('User-Update', {
+            userId: updatedUser._id,
+            email: updatedUser.email,
+        });
         res.status(200).json({ user: updatedUser });
     } catch (err) {
         res.status(400).json({ error: err.message });
