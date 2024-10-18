@@ -1,5 +1,6 @@
 // src/services/quizService.js
 const { Quiz } = require('../models/quizModel');
+const { Submission } = require('../models/submissionModel');
 
 exports.saveQuiz = async (courseId, quizData) => {
     const quiz = new Quiz({ ...quizData, courseId });
