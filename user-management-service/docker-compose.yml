@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  user-management-service:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/userdb
+      - JWT_SECRET=your_jwt_secret
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
