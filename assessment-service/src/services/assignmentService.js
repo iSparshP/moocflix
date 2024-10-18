@@ -20,3 +20,14 @@ exports.submitAssignmentAnswers = async (assignmentId, submissionData) => {
 exports.fetchAssignmentResult = async (assignmentId) => {
     return await AssignmentSubmission.findOne({ assignmentId });
 };
+
+exports.gradeAssignmentSubmission = async (
+    assignmentId,
+    submissionId,
+    grade
+) => {
+    await AssignmentSubmission.updateOne(
+        { assignmentId, _id: submissionId },
+        { $set: { grade } }
+    );
+};

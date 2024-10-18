@@ -1,26 +1,69 @@
 // src/index.js
 const express = require('express');
-const mongoose = require('mongoose');
+const connectDB = require('../configure/mongodb');
 const quizRoutes = require('./routes/quizRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
+const { consumeMessages } = require('./utils/kafka');
+const errorHandler = require('./middlewares/errorHandler');
+const authenticate = require('./middlewares/authenticate');
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 
+// Use authentication middleware for all routes
+app.use(authenticate);
+
 app.use(quizRoutes);
 app.use(assignmentRoutes);
 
-mongoose.connect(process.env.MONGODB_URI);
+// Error handling middleware
+app.use(errorHandler);
 
-const db = mongoose.connection;
-db.on('error', (error) => {
-    console.error('Error connecting to MongoDB:', error);
-});
-db.once('open', () => {
-    console.log('Connected to MongoDB');
-});
+// Connect to MongoDB
+connectDB();
 
 app.listen(3000, () => {
     console.log('Server is running on port 3000');
 });
+
+const handleMessage = (topic, message) => {
+    switch (topic) {
+        case 'User-Creation':
+            // Handle user creation logic
+            break;
+        case 'User-Update':
+            // Handle user update logic
+            break;
+        case 'Course-Creation':
+            // Handle course creation logic
+            break;
+        case 'Course-Update':
+            // Handle course update logic
+            break;
+        case 'Course-Deletion':
+            // Handle course deletion logic
+            break;
+        case 'Student-Enrolled':
+            // Handle student enrollment logic
+            break;
+        case 'Transcoding-Completed':
+            // Handle transcoding completed logic
+            break;
+        default:
+            console.log(`Unhandled topic: ${topic}`);
+    }
+};
+
+consumeMessages(
+    [
+        'User-Creation',
+        'User-Update',
+        'Course-Creation',
+        'Course-Update',
+        'Course-Deletion',
+        'Student-Enrolled',
+        'Transcoding-Completed',
+    ],
+    handleMessage
+);

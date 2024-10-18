@@ -1,7 +1,21 @@
 // src/controllers/quizController.js
 const { validateCourseId } = require('../services/courseService');
-const { saveQuiz } = require('../services/quizService');
-const { notifyStudents } = require('../services/notificationService');
+const {
+    saveQuiz,
+    fetchQuizzes,
+    submitQuizAnswers,
+    fetchQuizResults,
+    fetchQuizSubmissions,
+    fetchSubmissionDetails,
+    removeQuiz,
+    modifyQuiz,
+    gradeQuizSubmission,
+} = require('../services/quizService');
+const {
+    notifyStudents,
+    notifySubmissionCompleted,
+    notifyGradingCompleted,
+} = require('../services/notificationService');
 
 exports.createQuiz = async (req, res) => {
     const { courseId } = req.params;
@@ -55,22 +69,19 @@ exports.submitQuiz = async (req, res) => {
     const submissionData = req.body;
 
     try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
-
         // Submit quiz answers
-        const result = await submitQuizAnswers(
+        const submissionId = await submitQuizAnswers(
             courseId,
             quizId,
             submissionData
         );
 
-        res.status(200).json({
+        // Notify submission completed
+        await notifySubmissionCompleted(courseId, quizId, submissionId);
+
+        res.status(201).json({
             message: 'Quiz submitted successfully',
-            result,
+            submissionId,
         });
     } catch (error) {
         res.status(500).json({
@@ -84,12 +95,6 @@ exports.getQuizResults = async (req, res) => {
     const { courseId, quizId } = req.params;
 
     try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
-
         // Fetch quiz results
         const results = await fetchQuizResults(courseId, quizId);
         res.status(200).json(results);
@@ -105,12 +110,6 @@ exports.getQuizSubmissions = async (req, res) => {
     const { courseId, quizId } = req.params;
 
     try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
-
         // Fetch quiz submissions
         const submissions = await fetchQuizSubmissions(courseId, quizId);
         res.status(200).json(submissions);
@@ -126,12 +125,6 @@ exports.getSubmissionDetails = async (req, res) => {
     const { courseId, quizId, submissionId } = req.params;
 
     try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
-
         // Fetch submission details
         const submission = await fetchSubmissionDetails(
             courseId,
@@ -151,12 +144,6 @@ exports.deleteQuiz = async (req, res) => {
     const { courseId, quizId } = req.params;
 
     try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
-
         // Remove quiz
         await removeQuiz(courseId, quizId);
         res.status(200).json({ message: 'Quiz deleted successfully' });
@@ -173,12 +160,6 @@ exports.updateQuiz = async (req, res) => {
     const quizData = req.body;
 
     try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
-
         // Update quiz data
         await modifyQuiz(courseId, quizId, quizData);
         res.status(200).json({ message: 'Quiz updated successfully' });
@@ -197,6 +178,10 @@ exports.gradeQuiz = async (req, res) => {
     try {
         // Grade quiz submission
         await gradeQuizSubmission(quizId, submissionId, grade);
+
+        // Notify grading completed
+        await notifyGradingCompleted(quizId, submissionId);
+
         res.status(200).json({ message: 'Quiz graded successfully' });
     } catch (error) {
         res.status(500).json({
