@@ -1,11 +1,16 @@
 const User = require('../models/User.js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { sendMessage } = require('../../config/kafka');
 
 exports.signup = async (req, res) => {
     const { name, email, password, role } = req.body;
     try {
         const newUser = await User.create({ name, email, password, role });
+        await sendMessage('User-Creation', {
+            userId: newUser._id,
+            email: newUser.email,
+        });
         res.status(201).json({ message: 'User created', user: newUser });
     } catch (err) {
         res.status(400).json({ error: err.message });
