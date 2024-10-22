@@ -1,4 +1,4 @@
-// src/index.js
+// assessment-service/src/index.js
 const express = require('express');
 const connectDB = require('../configure/mongodb');
 const quizRoutes = require('./routes/quizRoutes');
@@ -50,6 +50,10 @@ const handleMessage = (topic, message) => {
         case 'Transcoding-Completed':
             // Handle transcoding completed logic
             break;
+        case 'AssignmentSubmitted':
+            // Handle assignment submission completed logic
+            // Notify instructor
+            break;
         default:
             console.log(`Unhandled topic: ${topic}`);
     }
@@ -64,6 +68,7 @@ consumeMessages(
         'Course-Deletion',
         'Student-Enrolled',
         'Transcoding-Completed',
+        'AssignmentSubmitted',
     ],
     handleMessage
 );

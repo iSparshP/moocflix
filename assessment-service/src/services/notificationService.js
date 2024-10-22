@@ -1,10 +1,10 @@
 // src/services/notificationService.js
 const kafka = require('../../configure/kafka');
 
-exports.notifyStudents = async (courseId, quizId) => {
+exports.notifyStudents = async (courseId, assignmentId) => {
     const message = {
         topic: 'Assessment-Creation',
-        messages: [{ value: JSON.stringify({ courseId, quizId }) }],
+        messages: [{ value: JSON.stringify({ courseId, assignmentId }) }],
     };
     await kafka.send(message);
 };
@@ -28,15 +28,12 @@ exports.notifyGradingCompleted = async (quizId, submissionId) => {
 };
 
 exports.notifyAssignmentSubmissionCompleted = async (
-    courseId,
     assignmentId,
     submissionId
 ) => {
     const message = {
-        topic: 'Submission-Completed',
-        messages: [
-            { value: JSON.stringify({ courseId, assignmentId, submissionId }) },
-        ],
+        topic: 'AssignmentSubmitted',
+        messages: [{ value: JSON.stringify({ assignmentId, submissionId }) }],
     };
     await kafka.send(message);
 };

@@ -8,14 +8,25 @@ const {
     notifyAssignmentSubmissionCompleted,
     notifyAssignmentGradingCompleted,
 } = require('../services/notificationService');
+const { validateCourseId } = require('../services/courseService');
 
 exports.createAssignment = async (req, res) => {
     const { courseId } = req.params;
     const assignmentData = req.body;
 
     try {
-        // Save assignment data
+        // Validate course ID
+        const isValidCourse = await validateCourseId(courseId);
+        if (!isValidCourse) {
+            return res.status(400).json({ message: 'Invalid course ID' });
+        }
+
+        // Save assignment
         const assignmentId = await saveAssignment(courseId, assignmentData);
+
+        // Notify students
+        await notifyStudents(courseId, assignmentId);
+
         res.status(201).json({
             message: 'Assignment created successfully',
             assignmentId,
