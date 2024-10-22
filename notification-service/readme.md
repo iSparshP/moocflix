@@ -16,16 +16,19 @@ Structure:
 │   ├── /middlewares         
 │   │   └── validateNotification.js      # Validate inputs and format notifications
 │   └── /subscribers                     # Listen to Kafka events for sending notifications
-│       └── kafkaConsumer.js             # Consume messages from other services
+│   │   └── kafkaConsumer.js             # Consume messages from other services
+│   └── index.js                         # Index file
 │
 ├── /config                  
 │   ├── smtpConfig.js                    # SMTP server configuration
 │   ├── pushNotificationConfig.js        # Push notification service config (Firebase)
 │   └── kafkaConfig.js                   # Kafka configuration for event listening
+├── .env                                 # Environment file to keep environment variables
 ├── /tests                   
 │   └── notification.test.js             # Unit tests for sending notifications
 ├── package.json             
 └── Dockerfile
+
 
 API Routes:
 POST   /api/v1/notifications/sendPush     // Send a push notification

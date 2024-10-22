@@ -1,14 +1,22 @@
 {
-  "name": "notification-service",
-  "version": "1.0.0",
-  "description": "MoocFlix: A mooc streaming platform notification-service is going to be a microservice which is going to carry out these tasks:",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "Sparsh Prakash",
-  "license": "ISC",
-  "dependencies": {
-    "express": "^4.21.1"
-  }
+    "name": "notification-service",
+    "version": "1.0.0",
+    "description": "MoocFlix: A mooc streaming platform notification-service is going to be a microservice which is going to carry out these tasks:",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node src/index.js"
+    },
+    "author": "Sparsh Prakash",
+    "license": "ISC",
+    "dependencies": {
+        "body-parser": "^1.20.3",
+        "dotenv": "^16.4.5",
+        "express": "^4.21.1",
+        "firebase-admin": "^12.6.0",
+        "kafkajs": "^2.2.4",
+        "mailgun-js": "^0.22.0",
+        "pg": "^8.13.0",
+        "sequelize": "^6.37.4"
+    }
 }
