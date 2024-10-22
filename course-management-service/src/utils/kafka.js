@@ -1,4 +1,5 @@
 const { Kafka } = require('kafkajs');
+require('dotenv').config();
 
 const kafka = new Kafka({
     clientId: 'course-management-service',
@@ -6,6 +7,7 @@ const kafka = new Kafka({
 });
 
 const producer = kafka.producer();
+const consumer = kafka.consumer({ groupId: 'course-management-group' });
 
 const sendMessage = async (topic, message) => {
     await producer.connect();
@@ -16,4 +18,16 @@ const sendMessage = async (topic, message) => {
     await producer.disconnect();
 };
 
-module.exports = { sendMessage };
+const consumeMessages = async (topics, callback) => {
+    await consumer.connect();
+    for (const topic of topics) {
+        await consumer.subscribe({ topic, fromBeginning: true });
+    }
+    await consumer.run({
+        eachMessage: async ({ topic, partition, message }) => {
+            callback(topic, JSON.parse(message.value.toString()));
+        },
+    });
+};
+
+module.exports = { sendMessage, consumeMessages };

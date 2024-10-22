@@ -1,12 +1,13 @@
 const Course = require('../models/course');
 const axios = require('axios');
 const kafka = require('../utils/kafka');
+const config = require('../../config/config');
 
 module.exports = async (courseId, moduleData, instructorId) => {
     // Validate instructor
     try {
         const userResponse = await axios.get(
-            `${process.env.USER_MANAGEMENT_SERVICE_URL}/validate`,
+            `${config.userManagementServiceURL}/validate`,
             {
                 headers: { Authorization: `Bearer ${instructorId}` },
             }

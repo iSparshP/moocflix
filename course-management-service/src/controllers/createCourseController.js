@@ -1,3 +1,4 @@
+// course-management-service/src/controllers/createCourseController.js
 const createCourseService = require('../services/createCourseService');
 
 exports.createCourse = async (req, res) => {

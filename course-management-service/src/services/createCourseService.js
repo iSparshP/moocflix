@@ -1,12 +1,14 @@
+// course-management-service/src/services/createCourseService.js
 const Course = require('../models/course');
 const axios = require('axios');
 const kafka = require('../utils/kafka');
+const config = require('../../config/config');
 
 module.exports = async (courseData, instructorId) => {
     // Validate instructor
     try {
         const userResponse = await axios.get(
-            `${process.env.USER_MANAGEMENT_SERVICE_URL}/validate`,
+            `${config.userManagementServiceURL}/validate`,
             {
                 headers: { Authorization: `Bearer ${instructorId}` },
             }
@@ -27,7 +29,7 @@ module.exports = async (courseData, instructorId) => {
     await course.save();
 
     // Send Kafka message
-    kafka.sendMessage('Course-Creation', { courseId: course._id, courseData });
+    kafka.sendMessage('CourseCreated', { courseId: course._id, courseData });
 
     return course;
 };

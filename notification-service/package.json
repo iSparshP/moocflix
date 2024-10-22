@@ -1,0 +1,14 @@
+{
+  "name": "notification-service",
+  "version": "1.0.0",
+  "description": "MoocFlix: A mooc streaming platform notification-service is going to be a microservice which is going to carry out these tasks:",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sparsh Prakash",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.1"
+  }
+}

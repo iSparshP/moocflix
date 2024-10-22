@@ -20,10 +20,33 @@ exports.uploadVideo = async (req, res) => {
         const values = [file.originalname, s3Response.Location];
         const result = await pool.query(query, values);
 
+        // Request transcoding via Kafka
+        await requestTranscoding(result.rows[0].id);
+
         res.status(201).send(result.rows[0]);
     } catch (error) {
         console.error('Error uploading video:', error);
         res.status(500).send('Error uploading video.');
+    }
+};
+
+// content-delivery-service/src/controllers/contentController.js
+exports.getCourseVideos = async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+
+        // Fetch videos from PostgreSQL
+        const query = 'SELECT * FROM videos WHERE course_id = $1';
+        const result = await pool.query(query, [courseId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).send('No videos found for this course.');
+        }
+
+        res.status(200).send(result.rows);
+    } catch (error) {
+        console.error('Error fetching course videos:', error);
+        res.status(500).send('Error fetching course videos.');
     }
 };
 

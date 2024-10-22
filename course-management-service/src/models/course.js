@@ -6,11 +6,18 @@ const moduleSchema = new mongoose.Schema({
     // Add other fields as necessary
 });
 
+const videoSchema = new mongoose.Schema({
+    title: String,
+    url: String,
+    // Add other fields as necessary
+});
+
 const courseSchema = new mongoose.Schema({
     name: String,
     description: String,
     instructor: String,
     modules: [moduleSchema],
+    videos: [videoSchema], // Array of video objects
     students: [String], // Array of student IDs
     // Add other fields as necessary
 });
