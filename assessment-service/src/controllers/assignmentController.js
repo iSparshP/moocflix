@@ -3,6 +3,7 @@ const {
     saveAssignment,
     submitAssignmentAnswers,
     fetchAssignmentResult,
+    gradeAssignmentSubmission,
 } = require('../services/assignmentService');
 const {
     notifyAssignmentSubmissionCompleted,

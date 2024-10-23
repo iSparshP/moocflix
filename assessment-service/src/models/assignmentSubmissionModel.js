@@ -4,8 +4,9 @@ const mongoose = require('mongoose');
 const assignmentSubmissionSchema = new mongoose.Schema({
     assignmentId: String,
     studentId: String,
-    answers: Array,
+    submissionUrl: String,
     submittedAt: { type: Date, default: Date.now },
+    grade: Number,
 });
 
 const AssignmentSubmission = mongoose.model(

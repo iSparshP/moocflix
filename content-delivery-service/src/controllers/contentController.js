@@ -1,3 +1,4 @@
+// content-delivery-service/src/controllers/contentController.js
 const { uploadToS3, deleteFromS3 } = require('../services/uploadService.js');
 const { pool, redisClient } = require('../config/db');
 const { requestTranscoding } = require('../services/transcodeService.js');
@@ -16,8 +17,12 @@ exports.uploadVideo = async (req, res) => {
 
         // Save metadata to PostgreSQL
         const query =
-            'INSERT INTO videos (filename, s3_url) VALUES ($1, $2) RETURNING *';
-        const values = [file.originalname, s3Response.Location];
+            'INSERT INTO videos (filename, s3_url, course_id) VALUES ($1, $2, $3) RETURNING *';
+        const values = [
+            file.originalname,
+            s3Response.Location,
+            req.body.courseId,
+        ];
         const result = await pool.query(query, values);
 
         // Request transcoding via Kafka
@@ -30,7 +35,6 @@ exports.uploadVideo = async (req, res) => {
     }
 };
 
-// content-delivery-service/src/controllers/contentController.js
 exports.getCourseVideos = async (req, res) => {
     try {
         const courseId = req.params.courseId;

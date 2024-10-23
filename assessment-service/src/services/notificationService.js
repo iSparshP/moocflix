@@ -28,12 +28,15 @@ exports.notifyGradingCompleted = async (quizId, submissionId) => {
 };
 
 exports.notifyAssignmentSubmissionCompleted = async (
+    courseId,
     assignmentId,
     submissionId
 ) => {
     const message = {
         topic: 'AssignmentSubmitted',
-        messages: [{ value: JSON.stringify({ assignmentId, submissionId }) }],
+        messages: [
+            { value: JSON.stringify({ courseId, assignmentId, submissionId }) },
+        ],
     };
     await kafka.send(message);
 };

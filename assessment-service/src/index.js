@@ -1,4 +1,4 @@
-// assessment-service/src/index.js
+// src/index.js
 const express = require('express');
 const connectDB = require('../configure/mongodb');
 const quizRoutes = require('./routes/quizRoutes');
