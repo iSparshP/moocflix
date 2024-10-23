@@ -1,23 +1,60 @@
+version: '3.8'
+
 services:
-  zookeeper:
+  zookeeper1:
     image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper1
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_SERVERS: zookeeper1:2888:3888,zookeeper2:2888:3888,zookeeper3:2888:3888
     ports:
       - "2181:2181"
+    volumes:
+      - ./zookeeper/zookeeper1.properties:/etc/kafka/zookeeper.properties
+
+  zookeeper2:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper2
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_SERVERS: zookeeper1:2888:3888,zookeeper2:2888:3888,zookeeper3:2888:3888
+    ports:
+      - "2182:2181"
+    volumes:
+      - ./zookeeper/zookeeper2.properties:/etc/kafka/zookeeper.properties
+
+  zookeeper3:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper3
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_SERVERS: zookeeper1:2888:3888,zookeeper2:2888:3888,zookeeper3:2888:3888
+    ports:
+      - "2183:2181"
+    volumes:
+      - ./zookeeper/zookeeper3.properties:/etc/kafka/zookeeper.properties
 
   kafka:
     image: confluentinc/cp-kafka:latest
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
     ports:
       - "9092:9092"
     depends_on:
-      - zookeeper
+      - zookeeper1
+      - zookeeper2
+      - zookeeper3
+    volumes:
+      - ./kafka/server.properties:/etc/kafka/server.properties
 
   content-delivery-service:
     build:
@@ -37,6 +74,7 @@ services:
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     depends_on:
       - kafka
 
@@ -53,6 +91,7 @@ services:
       - INPUT_VIDEO_PATH=/app/videos/input
       - OUTPUT_VIDEO_PATH=/app/videos/output
       - HEALTH_CHECK_PORT=3001
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     volumes:
       - ./transcoding-service/videos/input:/app/videos/input
       - ./transcoding-service/videos/output:/app/videos/output
@@ -79,7 +118,8 @@ services:
       - FIREBASE_TOKEN_URI=${FIREBASE_TOKEN_URI}
       - FIREBASE_AUTH_PROVIDER_X509_CERT_URL=${FIREBASE_AUTH_PROVIDER_X509_CERT_URL}
       - FIREBASE_CLIENT_X509_CERT_URL=${FIREBASE_CLIENT_X509_CERT_URL}
-      - KAFKA_BROKER=${KAFKA_BROKER}
+      - KAFKA_BROKER=kafka:9092
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     depends_on:
       - kafka
 
@@ -93,7 +133,7 @@ services:
       - MONGO_URI=${MONGO_URI}
       - JWT_SECRET=${JWT_SECRET}
       - KAFKA_BROKER=kafka:9092
-      - KAFKAJS_NO_PARTITIONER_WARNING=true
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     depends_on:
       - kafka
 
@@ -107,6 +147,7 @@ services:
       - MONGO_URI=${MONGO_URI}
       - JWT_SECRET=${JWT_SECRET}
       - KAFKA_BROKER=kafka:9092
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     depends_on:
       - kafka
 
@@ -120,6 +161,6 @@ services:
       - MONGO_URI=${MONGO_URI}
       - JWT_SECRET=${JWT_SECRET}
       - KAFKA_BROKER=kafka:9092
-
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     depends_on:
       - kafka
