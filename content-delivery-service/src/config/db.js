@@ -28,4 +28,8 @@ redisClient.on('error', (err) => {
     console.error('Redis error', err);
 });
 
+redisClient.on('end', () => {
+    console.log('Redis client disconnected');
+});
+
 module.exports = { pool, redisClient };

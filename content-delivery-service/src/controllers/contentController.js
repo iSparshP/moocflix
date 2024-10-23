@@ -151,16 +151,15 @@ exports.streamVideo = async (req, res) => {
 };
 
 exports.transcodeVideo = async (req, res) => {
+    const { videoId } = req.params;
     try {
-        const videoId = req.params.videoId;
-
-        // Request transcoding via Kafka
         await requestTranscoding(videoId);
-
-        res.status(200).send('Transcoding requested.');
-    } catch (error) {
-        console.error('Error requesting transcoding:', error);
-        res.status(500).send('Error requesting transcoding.');
+        res.status(200).send({
+            message: 'Transcoding job requested successfully.',
+        });
+    } catch (err) {
+        console.error('Error requesting transcoding:', err);
+        res.status(500).send({ message: 'Error requesting transcoding.' });
     }
 };
 
