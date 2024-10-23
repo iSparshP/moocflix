@@ -1,0 +1,125 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+
+  content-delivery-service:
+    build:
+      context: ./content-delivery-service
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TRANSCODE_TOPIC=transcode-requests
+      - REDIS_URL=${REDIS_URL}
+      - PGHOST=${PGHOST}
+      - PGUSER=${PGUSER}
+      - PGDATABASE=${PGDATABASE}
+      - PGPASSWORD=${PGPASSWORD}
+      - PGPORT=${PGPORT}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    depends_on:
+      - kafka
+
+  transcoding-service:
+    build:
+      context: ./transcoding-service
+    ports:
+      - "3006:3006"
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TRANSCODE_TOPIC=transcode-requests
+      - INPUT_VIDEO_PATH=/app/videos/input
+      - OUTPUT_VIDEO_PATH=/app/videos/output
+      - HEALTH_CHECK_PORT=3001
+    volumes:
+      - ./transcoding-service/videos/input:/app/videos/input
+      - ./transcoding-service/videos/output:/app/videos/output
+    depends_on:
+      - kafka
+
+  notification-service:
+    build:
+      context: ./notification-service
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      - MAILGUN_SENDER=${MAILGUN_SENDER}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_PRIVATE_KEY_ID=${FIREBASE_PRIVATE_KEY_ID}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_CLIENT_ID=${FIREBASE_CLIENT_ID}
+      - FIREBASE_AUTH_URI=${FIREBASE_AUTH_URI}
+      - FIREBASE_TOKEN_URI=${FIREBASE_TOKEN_URI}
+      - FIREBASE_AUTH_PROVIDER_X509_CERT_URL=${FIREBASE_AUTH_PROVIDER_X509_CERT_URL}
+      - FIREBASE_CLIENT_X509_CERT_URL=${FIREBASE_CLIENT_X509_CERT_URL}
+      - KAFKA_BROKER=${KAFKA_BROKER}
+    depends_on:
+      - kafka
+
+  user-management-service:
+    build:
+      context: ./user-management-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=${MONGO_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - KAFKA_BROKER=kafka:9092
+      - KAFKAJS_NO_PARTITIONER_WARNING=true
+    depends_on:
+      - kafka
+
+  course-management-service:
+    build:
+      context: ./course-management-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=${MONGO_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - KAFKA_BROKER=kafka:9092
+    depends_on:
+      - kafka
+
+  assessment-service:
+    build:
+      context: ./assessment-service
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=${MONGO_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - KAFKA_BROKER=kafka:9092
+
+    depends_on:
+      - kafka

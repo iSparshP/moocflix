@@ -7,7 +7,7 @@
 
 # dependencies
 /node_modules
-
+.env
 # IDEs and editors
 
 # ignore all these folders

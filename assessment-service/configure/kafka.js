@@ -1,10 +1,10 @@
-// configure/kafka.js
-const { Kafka } = require('kafkajs');
+const { Kafka, Partitioners } = require('kafkajs');
 require('dotenv').config();
 
 const kafka = new Kafka({
     clientId: 'assessment-service',
     brokers: [process.env.KAFKA_BROKER],
+    createPartitioner: Partitioners.LegacyPartitioner,
 });
 
 const producer = kafka.producer();
