@@ -1,4 +1,3 @@
-// content-delivery-service/src/services/uploadService.js
 const AWS = require('aws-sdk');
 const fs = require('fs');
 const path = require('path');
@@ -23,7 +22,7 @@ exports.uploadToS3 = (file) => {
                 console.log('Upload successful:', data);
 
                 // Send Kafka message for transcoding
-                kafka.sendMessage('TranscodingRequest', {
+                kafka.sendMessage(process.env.KAFKA_TRANSCODE_TOPIC, {
                     videoUrl: data.Location,
                 });
 
