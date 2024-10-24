@@ -65,7 +65,6 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
     volumes:
-      - ./kafka/server1.properties:/etc/kafka/server.properties
       - kafka_data1:/var/lib/kafka/data
     networks:
       - kafka_network
@@ -85,7 +84,6 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
     volumes:
-      - ./kafka/server2.properties:/etc/kafka/server.properties
       - kafka_data2:/var/lib/kafka/data
     networks:
       - kafka_network
@@ -105,7 +103,6 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
     volumes:
-      - ./kafka/server3.properties:/etc/kafka/server.properties
       - kafka_data3:/var/lib/kafka/data
     networks:
       - kafka_network
