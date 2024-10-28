@@ -19,6 +19,14 @@ const userSchema = new mongoose.Schema({
         enum: ['student', 'instructor', 'admin'],
         default: 'student',
     },
+    notificationPreferences: {
+        type: Map,
+        of: Boolean,
+        default: {
+            email: true,
+            push: true,
+        },
+    },
 });
 
 userSchema.pre('save', async function (next) {

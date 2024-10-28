@@ -35,3 +35,16 @@ exports.deactivateAccount = async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 };
+
+exports.updateNotificationPreferences = async (req, res) => {
+    try {
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user.id,
+            { notificationPreferences: req.body.notificationPreferences },
+            { new: true }
+        );
+        res.status(200).json({ user: updatedUser });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
