@@ -5,6 +5,10 @@ const handleIncomingMessage = async (topic, message) => {
     switch (topic) {
         case 'Student-Enrolled':
             // Handle student enrollment logic
+            // Example: Fetch course videos and send them to the student
+            const { courseId, studentId } = message;
+            const videos = await Video.findAll({ where: { courseId } });
+            // Send videos to the student (implementation depends on your system)
             break;
         case 'Transcoding-Completed':
             // Handle transcoding completed logic
