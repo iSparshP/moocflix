@@ -24,6 +24,10 @@ const handleIncomingMessage = async (topic, message) => {
         case 'Transcoding-Completed':
             // Handle transcoding completed logic
             break;
+        case 'AssignmentSubmitted':
+            // Handle assignment submission completed logic
+            // Notify instructor
+            break;
         default:
             console.log(`Unhandled topic: ${topic}`);
     }
@@ -39,6 +43,7 @@ const initializeKafkaConsumer = () => {
             'Course-Deletion',
             'Student-Enrolled',
             'Transcoding-Completed',
+            'AssignmentSubmitted',
         ],
         handleIncomingMessage
     );
