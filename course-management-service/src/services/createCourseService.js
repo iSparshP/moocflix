@@ -6,22 +6,15 @@ const config = require('../../config/config');
 
 module.exports = async (courseData, instructorId) => {
     // Validate instructor
-    try {
-        const userResponse = await axios.get(
-            `${config.userManagementServiceURL}/validate`,
-            {
-                headers: { Authorization: `Bearer ${instructorId}` },
-            }
-        );
-
-        if (
-            !userResponse.data.valid ||
-            userResponse.data.role !== 'instructor'
-        ) {
-            throw new Error('Unauthorized');
+    const userResponse = await axios.get(
+        `${config.userManagementServiceURL}/validate`,
+        {
+            headers: { Authorization: `Bearer ${instructorId}` },
         }
-    } catch (error) {
-        throw new Error('User validation failed');
+    );
+
+    if (!userResponse.data.valid || userResponse.data.role !== 'instructor') {
+        throw new Error('Unauthorized');
     }
 
     // Create course
@@ -29,7 +22,7 @@ module.exports = async (courseData, instructorId) => {
     await course.save();
 
     // Send Kafka message
-    kafka.sendMessage('CourseCreated', { courseId: course._id, courseData });
+    kafka.sendMessage('Course-Creation', { courseId: course._id, courseData });
 
     return course;
 };

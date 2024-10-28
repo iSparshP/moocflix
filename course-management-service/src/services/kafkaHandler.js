@@ -44,22 +44,32 @@ const sendCourseCreatedEvent = async (courseId, courseData) => {
     await sendMessage('Course-Creation', { courseId, courseData });
 };
 
-const sendStudentEnrolledEvent = async (courseId, studentId) => {
-    await sendMessage('Student-Enrolled', { courseId, studentId });
+const sendCourseUpdatedEvent = async (courseId, courseData) => {
+    await sendMessage('Course-Update', { courseId, courseData });
+};
+
+const sendCourseDeletedEvent = async (courseId) => {
+    await sendMessage('Course-Deletion', { courseId });
+};
+
+const sendModuleCreatedEvent = async (courseId, moduleData) => {
+    await sendMessage('Module-Creation', { courseId, moduleData });
 };
 
 const sendModuleUpdatedEvent = async (courseId, moduleId, moduleData) => {
-    await sendMessage('Module-Updated', { courseId, moduleId, moduleData });
+    await sendMessage('Module-Update', { courseId, moduleId, moduleData });
 };
 
 const sendModuleDeletedEvent = async (courseId, moduleId) => {
-    await sendMessage('Module-Deleted', { courseId, moduleId });
+    await sendMessage('Module-Deletion', { courseId, moduleId });
 };
 
 module.exports = {
     initializeKafkaConsumer,
     sendCourseCreatedEvent,
-    sendStudentEnrolledEvent,
+    sendCourseUpdatedEvent,
+    sendCourseDeletedEvent,
+    sendModuleCreatedEvent,
     sendModuleUpdatedEvent,
     sendModuleDeletedEvent,
 };

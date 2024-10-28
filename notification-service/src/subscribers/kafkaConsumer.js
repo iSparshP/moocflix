@@ -15,6 +15,30 @@ exports.start = async () => {
         topic: 'Submission-Completed',
         fromBeginning: true,
     });
+    await consumer.subscribe({
+        topic: 'Course-Creation',
+        fromBeginning: true,
+    });
+    await consumer.subscribe({
+        topic: 'Course-Update',
+        fromBeginning: true,
+    });
+    await consumer.subscribe({
+        topic: 'Course-Deletion',
+        fromBeginning: true,
+    });
+    await consumer.subscribe({
+        topic: 'Module-Creation',
+        fromBeginning: true,
+    });
+    await consumer.subscribe({
+        topic: 'Module-Update',
+        fromBeginning: true,
+    });
+    await consumer.subscribe({
+        topic: 'Module-Deletion',
+        fromBeginning: true,
+    });
     // Subscribe to other topics...
 
     await consumer.run({
@@ -26,6 +50,36 @@ exports.start = async () => {
                     break;
                 case 'Submission-Completed':
                     await notificationService.sendEmailNotification(event);
+                    break;
+                case 'Course-Creation':
+                    await notificationService.sendCourseCreationNotification(
+                        event
+                    );
+                    break;
+                case 'Course-Update':
+                    await notificationService.sendCourseUpdateNotification(
+                        event
+                    );
+                    break;
+                case 'Course-Deletion':
+                    await notificationService.sendCourseDeletionNotification(
+                        event
+                    );
+                    break;
+                case 'Module-Creation':
+                    await notificationService.sendModuleCreationNotification(
+                        event
+                    );
+                    break;
+                case 'Module-Update':
+                    await notificationService.sendModuleUpdateNotification(
+                        event
+                    );
+                    break;
+                case 'Module-Deletion':
+                    await notificationService.sendModuleDeletionNotification(
+                        event
+                    );
                     break;
                 // Handle other topics...
             }

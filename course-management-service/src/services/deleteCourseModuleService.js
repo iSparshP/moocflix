@@ -5,22 +5,15 @@ const config = require('../../config/config');
 
 module.exports = async (courseId, moduleId, instructorId) => {
     // Validate instructor
-    try {
-        const userResponse = await axios.get(
-            `${config.userManagementServiceURL}/validate`,
-            {
-                headers: { Authorization: `Bearer ${instructorId}` },
-            }
-        );
-
-        if (
-            !userResponse.data.valid ||
-            userResponse.data.role !== 'instructor'
-        ) {
-            throw new Error('Unauthorized');
+    const userResponse = await axios.get(
+        `${config.userManagementServiceURL}/validate`,
+        {
+            headers: { Authorization: `Bearer ${instructorId}` },
         }
-    } catch (error) {
-        throw new Error('User validation failed');
+    );
+
+    if (!userResponse.data.valid || userResponse.data.role !== 'instructor') {
+        throw new Error('Unauthorized');
     }
 
     // Find course and delete module

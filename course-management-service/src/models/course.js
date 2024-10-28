@@ -13,13 +13,29 @@ const videoSchema = new mongoose.Schema({
 });
 
 const courseSchema = new mongoose.Schema({
-    name: String,
-    description: String,
-    instructor: String,
+    title: {
+        type: String,
+        required: true,
+    },
+    description: {
+        type: String,
+        required: true,
+    },
+    instructor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+    },
     modules: [moduleSchema],
     videos: [videoSchema], // Array of video objects
-    students: [String], // Array of student IDs
+    students: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+    ], // Array of student IDs
     // Add other fields as necessary
 });
 
-module.exports = mongoose.model('Course', courseSchema);
+const Course = mongoose.model('Course', courseSchema);
+module.exports = Course;
