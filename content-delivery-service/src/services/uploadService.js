@@ -23,7 +23,7 @@ exports.uploadToS3 = (file) => {
 
                 // Send Kafka message for transcoding
                 kafka.sendMessage(process.env.KAFKA_TRANSCODE_TOPIC, {
-                    videoUrl: data.Location,
+                    videoId: data.Key,
                 });
 
                 resolve(data);

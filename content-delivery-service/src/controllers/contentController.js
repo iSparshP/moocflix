@@ -1,9 +1,10 @@
 // content-delivery-service/src/controllers/contentController.js
 const { uploadToS3, deleteFromS3 } = require('../services/uploadService.js');
-const { pool, redisClient } = require('../config/db');
+const { redisClient } = require('../config/db');
 const { requestTranscoding } = require('../services/transcodeService.js');
 const fs = require('fs');
 const path = require('path');
+const Video = require('../models/Video');
 
 exports.uploadVideo = async (req, res) => {
     try {
@@ -16,19 +17,16 @@ exports.uploadVideo = async (req, res) => {
         const s3Response = await uploadToS3(file);
 
         // Save metadata to PostgreSQL
-        const query =
-            'INSERT INTO videos (filename, s3_url, course_id) VALUES ($1, $2, $3) RETURNING *';
-        const values = [
-            file.originalname,
-            s3Response.Location,
-            req.body.courseId,
-        ];
-        const result = await pool.query(query, values);
+        const video = await Video.create({
+            filename: file.originalname,
+            s3_url: s3Response.Location,
+            course_id: req.body.courseId,
+        });
 
         // Request transcoding via Kafka
-        await requestTranscoding(result.rows[0].id);
+        await requestTranscoding(video.id);
 
-        res.status(201).send(result.rows[0]);
+        res.status(201).send(video);
     } catch (error) {
         console.error('Error uploading video:', error);
         res.status(500).send('Error uploading video.');
@@ -40,14 +38,13 @@ exports.getCourseVideos = async (req, res) => {
         const courseId = req.params.courseId;
 
         // Fetch videos from PostgreSQL
-        const query = 'SELECT * FROM videos WHERE course_id = $1';
-        const result = await pool.query(query, [courseId]);
+        const videos = await Video.findAll({ where: { course_id: courseId } });
 
-        if (result.rows.length === 0) {
+        if (videos.length === 0) {
             return res.status(404).send('No videos found for this course.');
         }
 
-        res.status(200).send(result.rows);
+        res.status(200).send(videos);
     } catch (error) {
         console.error('Error fetching course videos:', error);
         res.status(500).send('Error fetching course videos.');
@@ -66,21 +63,16 @@ exports.fetchVideo = async (req, res) => {
                 return res.status(200).send(JSON.parse(data));
             } else {
                 // Fetch from PostgreSQL
-                const query = 'SELECT * FROM videos WHERE id = $1';
-                const result = await pool.query(query, [videoId]);
+                const video = await Video.findByPk(videoId);
 
-                if (result.rows.length === 0) {
+                if (!video) {
                     return res.status(404).send('Video not found.');
                 }
 
                 // Save to cache
-                redisClient.setex(
-                    videoId,
-                    3600,
-                    JSON.stringify(result.rows[0])
-                );
+                redisClient.setex(videoId, 3600, JSON.stringify(video));
 
-                res.status(200).send(result.rows[0]);
+                res.status(200).send(video);
             }
         });
     } catch (error) {
@@ -94,18 +86,13 @@ exports.streamVideo = async (req, res) => {
         const videoId = req.params.videoId;
 
         // Fetch video details from PostgreSQL
-        const query = 'SELECT * FROM videos WHERE id = $1';
-        const result = await pool.query(query, [videoId]);
+        const video = await Video.findByPk(videoId);
 
-        if (result.rows.length === 0) {
+        if (!video) {
             return res.status(404).send('Video not found.');
         }
 
-        const videoPath = path.join(
-            __dirname,
-            '../uploads',
-            result.rows[0].filename
-        );
+        const videoPath = path.join(__dirname, '../uploads', video.filename);
         const stat = fs.statSync(videoPath);
         const fileSize = stat.size;
         const range = req.headers.range;
@@ -168,15 +155,16 @@ exports.deleteVideo = async (req, res) => {
         const videoId = req.params.videoId;
 
         // Delete from PostgreSQL
-        const query = 'DELETE FROM videos WHERE id = $1 RETURNING *';
-        const result = await pool.query(query, [videoId]);
+        const video = await Video.findByPk(videoId);
 
-        if (result.rows.length === 0) {
+        if (!video) {
             return res.status(404).send('Video not found.');
         }
 
+        await video.destroy();
+
         // Delete from S3
-        const s3Key = result.rows[0].s3_url.split('/').pop();
+        const s3Key = video.s3_url.split('/').pop();
         await deleteFromS3(s3Key);
 
         res.status(200).send('Video deleted.');

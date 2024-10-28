@@ -3,6 +3,7 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 const contentRoutes = require('./routes/contentRoutes.js');
+const { sequelize } = require('./config/db');
 
 // Middleware to parse JSON bodies
 app.use(express.json());
@@ -16,7 +17,9 @@ process.on('unhandledRejection', (reason, promise) => {
     // Application specific logging, throwing an error, or other logic here
 });
 
-// Start the server
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+// Sync Sequelize models and start the server
+sequelize.sync({ force: false }).then(() => {
+    app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+    });
 });

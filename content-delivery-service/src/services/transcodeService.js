@@ -1,4 +1,3 @@
-// content-delivery-service/src/services/transcodeService.js
 const kafka = require('kafka-node');
 const Producer = kafka.Producer;
 const client = new kafka.KafkaClient({ kafkaHost: process.env.KAFKA_HOST });
