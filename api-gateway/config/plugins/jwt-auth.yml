@@ -1,0 +1,34 @@
+_format_version: "2.1"
+_transform: true
+
+plugins:
+  - name: jwt
+    service: user-management-service
+    config:
+      claims_to_verify:
+        - exp
+  - name: jwt
+    service: course-management-service
+    config:
+      claims_to_verify:
+        - exp
+  - name: jwt
+    service: content-delivery-service
+    config:
+      claims_to_verify:
+        - exp
+  - name: jwt
+    service: assessment-service
+    config:
+      claims_to_verify:
+        - exp
+  - name: jwt
+    service: transcoding-service
+    config:
+      claims_to_verify:
+        - exp
+  - name: jwt
+    service: notification-service
+    config:
+      claims_to_verify:
+        - exp

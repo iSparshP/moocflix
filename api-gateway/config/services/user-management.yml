@@ -1,0 +1,9 @@
+_format_version: "2.1"
+services:
+  - name: user-management-service
+    url: http://user-management-service:3000
+    routes:
+      - name: user-management-route
+        paths:
+          - /api/v1/users
+          - /api/v1/profile

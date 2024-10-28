@@ -1,0 +1,28 @@
+_format_version: "2.1"
+_transform: true
+
+plugins:
+  - name: rate-limiting
+    service: user-management-service
+    config:
+      minute: 100
+  - name: rate-limiting
+    service: course-management-service
+    config:
+      minute: 100
+  - name: rate-limiting
+    service: content-delivery-service
+    config:
+      minute: 100
+  - name: rate-limiting
+    service: assessment-service
+    config:
+      minute: 100
+  - name: rate-limiting
+    service: transcoding-service
+    config:
+      minute: 100
+  - name: rate-limiting
+    service: notification-service
+    config:
+      minute: 100

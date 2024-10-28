@@ -1,0 +1,8 @@
+_format_version: "2.1"
+_transform: true
+
+routes:
+  - name: content-delivery
+    paths:
+      - /api/v1/content
+    service: content-delivery-service

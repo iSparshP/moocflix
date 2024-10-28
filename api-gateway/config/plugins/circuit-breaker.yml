@@ -1,0 +1,34 @@
+_format_version: "2.1"
+_transform: true
+
+plugins:
+  - name: circuit-breaker
+    service: user-management-service
+    config:
+      threshold: 5
+      timeout: 10000
+  - name: circuit-breaker
+    service: course-management-service
+    config:
+      threshold: 5
+      timeout: 10000
+  - name: circuit-breaker
+    service: content-delivery-service
+    config:
+      threshold: 5
+      timeout: 10000
+  - name: circuit-breaker
+    service: assessment-service
+    config:
+      threshold: 5
+      timeout: 10000
+  - name: circuit-breaker
+    service: transcoding-service
+    config:
+      threshold: 5
+      timeout: 10000
+  - name: circuit-breaker
+    service: notification-service
+    config:
+      threshold: 5
+      timeout: 10000

@@ -1,0 +1,28 @@
+_format_version: "2.1"
+_transform: true
+
+plugins:
+  - name: file-log
+    service: user-management-service
+    config:
+      path: /usr/local/kong/logs/user-management.log
+  - name: file-log
+    service: course-management-service
+    config:
+      path: /usr/local/kong/logs/course-management.log
+  - name: file-log
+    service: content-delivery-service
+    config:
+      path: /usr/local/kong/logs/content-delivery.log
+  - name: file-log
+    service: assessment-service
+    config:
+      path: /usr/local/kong/logs/assessment.log
+  - name: file-log
+    service: transcoding-service
+    config:
+      path: /usr/local/kong/logs/transcoding.log
+  - name: file-log
+    service: notification-service
+    config:
+      path: /usr/local/kong/logs/notification.log
