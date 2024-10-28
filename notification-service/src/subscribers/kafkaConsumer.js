@@ -39,6 +39,14 @@ exports.start = async () => {
         topic: 'Module-Deletion',
         fromBeginning: true,
     });
+    await consumer.subscribe({
+        topic: 'User-Creation',
+        fromBeginning: true,
+    });
+    await consumer.subscribe({
+        topic: 'User-Update',
+        fromBeginning: true,
+    });
     // Subscribe to other topics...
 
     await consumer.run({
@@ -80,6 +88,14 @@ exports.start = async () => {
                     await notificationService.sendModuleDeletionNotification(
                         event
                     );
+                    break;
+                case 'User-Creation':
+                    await notificationService.sendUserCreationNotification(
+                        event
+                    );
+                    break;
+                case 'User-Update':
+                    await notificationService.sendUserUpdateNotification(event);
                     break;
                 // Handle other topics...
             }

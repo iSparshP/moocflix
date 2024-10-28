@@ -16,7 +16,17 @@ exports.sendPushNotification = async (data) => {
         },
         token: data.token,
     };
-    await admin.messaging().send(message);
+    await retry(
+        async () => {
+            await admin.messaging().send(message);
+        },
+        {
+            retries: 5,
+            onRetry: (err, attempt) => {
+                console.log(`Retry attempt ${attempt} for push notification`);
+            },
+        }
+    );
     await Notification.create({
         userId: data.userId,
         type: 'push',
@@ -38,7 +48,17 @@ exports.sendEmailNotification = async (data) => {
         subject: data.subject,
         text: data.body,
     };
-    await mailgun.messages().send(emailData);
+    await retry(
+        async () => {
+            await mailgun.messages().send(emailData);
+        },
+        {
+            retries: 5,
+            onRetry: (err, attempt) => {
+                console.log(`Retry attempt ${attempt} for email notification`);
+            },
+        }
+    );
     await Notification.create({
         userId: data.userId,
         type: 'email',
