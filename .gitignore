@@ -8,6 +8,7 @@
 # dependencies
 /node_modules
 .env
+.env.docker
 # IDEs and editors
 
 # ignore all these folders
