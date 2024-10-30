@@ -1,0 +1,13 @@
+_format_version: "2.1"
+plugins:
+  - name: health-checks
+    service: transcoding-service
+    config:
+      active:
+        http_path: "/health"
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 2

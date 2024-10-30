@@ -1,0 +1,8 @@
+_format_version: "2.1"
+plugins:
+  - name: cors
+    service: transcoding-service
+    config:
+      origins: ["*"]
+      methods: ["GET", "POST"]
+      headers: ["Accept", "Content-Type", "Authorization"]
