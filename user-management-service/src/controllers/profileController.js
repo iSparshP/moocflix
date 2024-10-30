@@ -20,6 +20,8 @@ exports.updateProfile = async (req, res) => {
         await sendMessage('User-Update', {
             userId: updatedUser._id,
             email: updatedUser.email,
+            role: updatedUser.role, // Add role
+            timestamp: new Date().toISOString(), // Add timestamp
         });
         res.status(200).json({ user: updatedUser });
     } catch (err) {

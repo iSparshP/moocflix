@@ -1,6 +1,7 @@
 // src/services/quizService.js
 const { Quiz } = require('../models/quizModel');
 const { Submission } = require('../models/submissionModel');
+const { NotFoundError, ValidationError } = require('../utils/errors');
 
 exports.saveQuiz = async (courseId, quizData) => {
     const quiz = new Quiz({ ...quizData, courseId });
@@ -9,11 +10,28 @@ exports.saveQuiz = async (courseId, quizData) => {
 };
 
 exports.fetchQuizzes = async (courseId) => {
-    return await Quiz.find({ courseId });
+    const quizzes = await Quiz.find({ courseId });
+    if (!quizzes.length) {
+        throw new NotFoundError('No quizzes found for this course');
+    }
+    return quizzes;
 };
 
 exports.submitQuizAnswers = async (courseId, quizId, submissionData) => {
-    const submission = new Submission({ ...submissionData, courseId, quizId });
+    const quiz = await Quiz.findOne({ courseId, _id: quizId });
+    if (!quiz) {
+        throw new NotFoundError('Quiz not found');
+    }
+
+    if (!submissionData.responses?.length) {
+        throw new ValidationError('Quiz submission must include responses');
+    }
+
+    const submission = new Submission({
+        ...submissionData,
+        courseId,
+        quizId,
+    });
     await submission.save();
     return submission._id;
 };
@@ -39,8 +57,17 @@ exports.modifyQuiz = async (courseId, quizId, quizData) => {
 };
 
 exports.gradeQuizSubmission = async (quizId, submissionId, grade) => {
+    const submission = await Submission.findById(submissionId);
+    if (!submission) {
+        throw new NotFoundError('Submission not found');
+    }
+
+    if (submission.quizId !== quizId) {
+        throw new ValidationError('Submission does not match quiz ID');
+    }
+
     await Submission.updateOne(
         { quizId, _id: submissionId },
-        { $set: { grade } }
+        { $set: { grade, gradedAt: new Date() } }
     );
 };

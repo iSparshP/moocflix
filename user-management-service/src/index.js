@@ -10,6 +10,7 @@ const morgan = require('morgan');
 const { connectProducer, connectConsumer } = require('../config/kafka');
 const { errorHandler } = require('./middlewares/errorHandler');
 const winston = require('winston');
+const { startConsumer } = require('./services/kafkaConsumer');
 
 const app = express();
 connectDB();
@@ -52,13 +53,22 @@ app.use(express.json());
 
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/profile', profileRoutes);
-
-// Error handling middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// Connect Kafka producer and consumer
-connectProducer();
-connectConsumer();
+const initializeKafka = async () => {
+    try {
+        await connectProducer();
+        await startConsumer();
+        console.log('Kafka producer and consumer initialized');
+    } catch (error) {
+        console.error('Failed to initialize Kafka:', error);
+        process.exit(1);
+    }
+};
+
+app.listen(PORT, async () => {
+    console.log(`Server running on port ${PORT}`);
+    await initializeKafka();
+});

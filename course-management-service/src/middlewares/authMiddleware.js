@@ -1,21 +1,27 @@
 const axios = require('axios');
+const config = require('../../config/config');
 
 module.exports = async (req, res, next) => {
     try {
-        const token = req.headers.authorization.split(' ')[1];
-        const response = await axios.get(
-            `${process.env.USER_MANAGEMENT_SERVICE_URL}/validate`,
+        const token = req.headers.authorization;
+        if (!token) {
+            return res.status(401).json({ error: 'No token provided' });
+        }
+
+        const userResponse = await axios.get(
+            `${config.userManagementServiceURL}/validate`,
             {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: token },
             }
         );
-        if (response.data.valid) {
-            req.user = response.data.user;
-            next();
-        } else {
-            res.status(401).json({ message: 'Unauthorized' });
+
+        if (!userResponse.data.valid) {
+            return res.status(401).json({ error: 'Invalid token' });
         }
+
+        req.user = userResponse.data;
+        next();
     } catch (error) {
-        res.status(401).json({ message: 'Unauthorized' });
+        res.status(401).json({ error: 'Authentication failed' });
     }
 };

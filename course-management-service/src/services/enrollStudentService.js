@@ -30,7 +30,13 @@ module.exports = async (courseId, studentId) => {
     await course.save();
 
     // Send Kafka message
-    kafka.sendMessage('Student-Enrolled', { courseId: course._id, studentId });
+    await kafka.sendMessage('Student-Enrolled', {
+        courseId: course._id,
+        studentId,
+        enrollmentDate: new Date(),
+        courseTitle: course.title,
+        courseModules: course.modules.length,
+    });
 
     return course;
 };

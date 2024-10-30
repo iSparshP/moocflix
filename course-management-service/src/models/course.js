@@ -1,9 +1,31 @@
 const mongoose = require('mongoose');
 
+const assessmentSchema = new mongoose.Schema({
+    assessmentId: String,
+    title: String,
+    type: String,
+    submissions: [
+        {
+            studentId: mongoose.Schema.Types.ObjectId,
+            submittedAt: Date,
+            status: String,
+        },
+    ],
+    grades: [
+        {
+            studentId: mongoose.Schema.Types.ObjectId,
+            score: Number,
+            feedback: String,
+            gradedAt: Date,
+        },
+    ],
+});
+
 const moduleSchema = new mongoose.Schema({
     title: String,
     content: String,
-    // Add other fields as necessary
+    videoUrl: String,
+    assessments: [assessmentSchema],
 });
 
 const videoSchema = new mongoose.Schema({

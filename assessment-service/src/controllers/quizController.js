@@ -64,30 +64,26 @@ exports.getQuizzes = async (req, res) => {
     }
 };
 
-exports.submitQuiz = async (req, res) => {
-    const { courseId, quizId } = req.params;
-    const submissionData = req.body;
-
+exports.submitQuiz = async (req, res, next) => {
     try {
-        // Submit quiz answers
+        const { courseId, quizId } = req.params;
+        const submissionData = req.body;
+
         const submissionId = await submitQuizAnswers(
             courseId,
             quizId,
             submissionData
         );
 
-        // Notify submission completed
         await notifySubmissionCompleted(courseId, quizId, submissionId);
 
         res.status(201).json({
+            status: 'success',
             message: 'Quiz submitted successfully',
-            submissionId,
+            data: { submissionId },
         });
     } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
-        });
+        next(error); // Pass to error handler
     }
 };
 

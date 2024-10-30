@@ -1,28 +1,39 @@
 const { sendMessage, consumeMessages } = require('../utils/kafka');
-const CourseService = require('./courseService');
+const assessmentHandler = require('../handlers/assessmentHandler');
+const gradingHandler = require('../handlers/gradingHandler');
+const submissionHandler = require('../handlers/submissionHandler');
+const userHandler = require('../handlers/userHandler');
+const moduleHandler = require('../handlers/moduleHandler');
 
 const handleIncomingMessage = async (topic, message) => {
-    switch (topic) {
-        case 'User-Creation':
-            // Handle user creation logic
-            break;
-        case 'User-Update':
-            // Handle user update logic
-            break;
-        case 'Assessment-Creation':
-            // Handle assessment creation logic
-            break;
-        case 'Submission-Completed':
-            // Handle submission completed logic
-            break;
-        case 'Grading-Completed':
-            // Handle grading completed logic
-            break;
-        case 'Transcoding-Completed':
-            // Handle transcoding completed logic
-            break;
-        default:
-            console.log(`Unhandled topic: ${topic}`);
+    try {
+        switch (topic) {
+            case 'User-Creation':
+                await userHandler.handleUserCreation(message);
+                break;
+            case 'User-Update':
+                await userHandler.handleUserUpdate(message);
+                break;
+            case 'Assessment-Creation':
+                await assessmentHandler.handleAssessmentCreation(message);
+                break;
+            case 'Submission-Completed':
+                await submissionHandler.handleSubmissionCompleted(message);
+                break;
+            case 'Grading-Completed':
+                await gradingHandler.handleGradingCompleted(message);
+                break;
+            case 'Transcoding-Completed':
+                await moduleHandler.handleTranscodingCompleted(message);
+                break;
+            default:
+                console.log(`Unhandled topic: ${topic}`);
+        }
+    } catch (error) {
+        console.error(
+            `Error handling kafka message for topic ${topic}:`,
+            error
+        );
     }
 };
 

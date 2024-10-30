@@ -1,74 +1,32 @@
 // src/index.js
+const { initializeKafkaConsumer } = require('./services/kafkaHandler');
 const express = require('express');
-const connectDB = require('../configure/mongodb');
+const connectDB = require('../config/mongodb');
 const quizRoutes = require('./routes/quizRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
-const { consumeMessages } = require('./utils/kafka');
 const errorHandler = require('./middlewares/errorHandler');
 const authenticate = require('./middlewares/authenticate');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 require('dotenv').config();
 
 const app = express();
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(express.json());
-
-// Use authentication middleware for all routes
 app.use(authenticate);
-
 app.use(quizRoutes);
 app.use(assignmentRoutes);
-
-// Error handling middleware
 app.use(errorHandler);
 
-// Connect to MongoDB
-connectDB();
-
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'up',
+        timestamp: new Date().toISOString(),
+    });
 });
 
-const handleMessage = (topic, message) => {
-    switch (topic) {
-        case 'User-Creation':
-            // Handle user creation logic
-            break;
-        case 'User-Update':
-            // Handle user update logic
-            break;
-        case 'Course-Creation':
-            // Handle course creation logic
-            break;
-        case 'Course-Update':
-            // Handle course update logic
-            break;
-        case 'Course-Deletion':
-            // Handle course deletion logic
-            break;
-        case 'Student-Enrolled':
-            // Handle student enrollment logic
-            break;
-        case 'Transcoding-Completed':
-            // Handle transcoding completed logic
-            break;
-        case 'AssignmentSubmitted':
-            // Handle assignment submission completed logic
-            // Notify instructor
-            break;
-        default:
-            console.log(`Unhandled topic: ${topic}`);
-    }
-};
+connectDB();
+app.listen(3000, () => console.log('Server is running on port 3000'));
 
-consumeMessages(
-    [
-        'User-Creation',
-        'User-Update',
-        'Course-Creation',
-        'Course-Update',
-        'Course-Deletion',
-        'Student-Enrolled',
-        'Transcoding-Completed',
-        'AssignmentSubmitted',
-    ],
-    handleMessage
-);
+// Initialize Kafka consumer
+initializeKafkaConsumer();

@@ -10,6 +10,8 @@ exports.signup = async (req, res) => {
         await sendMessage('User-Creation', {
             userId: newUser._id,
             email: newUser.email,
+            role: newUser.role,
+            timestamp: new Date().toISOString(),
         });
         res.status(201).json({ message: 'User created', user: newUser });
     } catch (err) {
