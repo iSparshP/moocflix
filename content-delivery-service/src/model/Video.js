@@ -8,11 +8,26 @@ const Video = sequelize.define('Video', {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
     },
-    url: {
+    filename: {
         type: DataTypes.STRING,
         allowNull: false,
     },
-    // Add other fields as necessary
+    s3_url: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    transcoded_url: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    course_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+    },
+    status: {
+        type: DataTypes.ENUM('pending', 'transcoding', 'completed', 'failed'),
+        defaultValue: 'pending',
+    },
 });
 
 module.exports = Video;

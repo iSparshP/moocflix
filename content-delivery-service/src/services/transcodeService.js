@@ -1,36 +1,25 @@
-const kafka = require('kafka-node');
-const Producer = kafka.Producer;
-const client = new kafka.KafkaClient({ kafkaHost: process.env.KAFKA_HOST });
-const producer = new Producer(client);
+// src/services/transcodeService.js
+const kafka = require('../utils/kafka');
+const Video = require('../models/Video');
 
-producer.on('ready', () => {
-    console.log('Kafka Producer is connected and ready.');
-});
+exports.requestTranscoding = async (videoId) => {
+    try {
+        // Update status to transcoding
+        await Video.update(
+            { status: 'transcoding' },
+            { where: { id: videoId } }
+        );
 
-producer.on('error', (err) => {
-    console.error('Kafka Producer error:', err);
-});
-
-exports.requestTranscoding = (videoId) => {
-    return new Promise((resolve, reject) => {
-        const payloads = [
-            {
-                topic: process.env.KAFKA_TRANSCODE_TOPIC,
-                messages: JSON.stringify({ videoId }),
-            },
-        ];
-
-        producer.send(payloads, (err, data) => {
-            if (err) {
-                console.error(
-                    'Error sending transcoding request to Kafka:',
-                    err
-                );
-                reject(err);
-            } else {
-                console.log('Transcoding request sent to Kafka:', data);
-                resolve(data);
-            }
+        // Send transcoding request
+        await kafka.sendMessage('Transcoding-Request', {
+            videoId,
+            timestamp: new Date().toISOString(),
         });
-    });
+
+        return true;
+    } catch (error) {
+        // Revert status on failure
+        await Video.update({ status: 'failed' }, { where: { id: videoId } });
+        throw error;
+    }
 };

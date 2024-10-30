@@ -1,25 +1,41 @@
+// src/index.js
 require('dotenv').config();
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 const contentRoutes = require('./routes/contentRoutes.js');
-const { sequelize } = require('./config/db');
+const { sequelize, redisClient } = require('./config/db');
+const { initializeKafkaConsumer } = require('./services/kafkaHandler');
 
-// Middleware to parse JSON bodies
-app.use(express.json());
+const initializeApp = async () => {
+    try {
+        // Connect to Redis
+        await redisClient.connect();
 
-// Import and use routes
-app.use('/api/v1/content', contentRoutes);
+        // Sync database
+        await sequelize.sync({ force: false });
 
-// Global error handler for unhandled promise rejections
+        // Initialize Kafka consumer
+        await initializeKafkaConsumer();
+
+        // Setup Express middleware
+        app.use(express.json());
+        app.use('/api/v1/content', contentRoutes);
+
+        // Start server
+        app.listen(port, () => {
+            console.log(`Server running on port ${port}`);
+        });
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        process.exit(1);
+    }
+};
+
+// Global error handler
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    // Application specific logging, throwing an error, or other logic here
+    process.exit(1);
 });
 
-// Sync Sequelize models and start the server
-sequelize.sync({ force: false }).then(() => {
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
-    });
-});
+initializeApp();

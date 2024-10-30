@@ -1,5 +1,6 @@
 // content-delivery-service/src/controllers/contentController.js
 const { uploadToS3, deleteFromS3 } = require('../services/uploadService.js');
+const { publishEnrollmentEvent } = require('../services/enrollmentService');
 const { redisClient } = require('../config/db');
 const { requestTranscoding } = require('../services/transcodeService.js');
 const fs = require('fs');
@@ -171,5 +172,38 @@ exports.deleteVideo = async (req, res) => {
     } catch (error) {
         console.error('Error deleting video:', error);
         res.status(500).send('Error deleting video.');
+    }
+};
+
+exports.enrollStudent = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        const { studentId } = req.body;
+
+        // Validate input
+        if (!courseId || !studentId) {
+            return res
+                .status(400)
+                .json({ message: 'Missing required parameters' });
+        }
+
+        // Publish enrollment event
+        await publishEnrollmentEvent(studentId, courseId);
+
+        // Fetch course videos for immediate access
+        const videos = await Video.findAll({
+            where: { course_id: courseId },
+            attributes: ['id', 'url', 'title'],
+        });
+
+        res.status(200).json({
+            message: 'Enrollment successful',
+            courseId,
+            studentId,
+            videos,
+        });
+    } catch (error) {
+        console.error('Error processing enrollment:', error);
+        res.status(500).json({ message: 'Failed to process enrollment' });
     }
 };

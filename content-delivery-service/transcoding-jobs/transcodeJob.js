@@ -44,7 +44,7 @@ const transcodeVideo = async (videoUrl) => {
         // Send Kafka message for transcoding completion
         await producer.connect();
         await producer.send({
-            topic: 'VideoTranscoded',
+            topic: 'Transcoding-Completed',
             messages: [
                 {
                     value: JSON.stringify({
@@ -64,15 +64,47 @@ const transcodeVideo = async (videoUrl) => {
 
 const run = async () => {
     await consumer.connect();
-    await consumer.subscribe({
-        topic: 'Transcoding-Request',
-        fromBeginning: true,
-    });
+    await consumer.subscribe({ topic: 'Transcoding-Request' });
 
     await consumer.run({
-        eachMessage: async ({ topic, partition, message }) => {
-            const { videoUrl } = JSON.parse(message.value.toString());
-            await transcodeVideo(videoUrl);
+        eachMessage: async ({ message }) => {
+            try {
+                const { videoId } = JSON.parse(message.value.toString());
+
+                // Get video details from database
+                const video = await Video.findByPk(videoId);
+                if (!video) throw new Error(`Video not found: ${videoId}`);
+
+                // Transcode video
+                const transcodedKey = await transcodeVideo(video.s3_url);
+
+                // Send completion message
+                await producer.send({
+                    topic: 'Transcoding-Completed',
+                    messages: [
+                        {
+                            value: JSON.stringify({
+                                videoId,
+                                transcodedUrl: transcodedKey,
+                            }),
+                        },
+                    ],
+                });
+            } catch (error) {
+                console.error('Transcoding failed:', error);
+                // Send failure message
+                await producer.send({
+                    topic: 'Transcoding-Failed',
+                    messages: [
+                        {
+                            value: JSON.stringify({
+                                videoId,
+                                error: error.message,
+                            }),
+                        },
+                    ],
+                });
+            }
         },
     });
 };

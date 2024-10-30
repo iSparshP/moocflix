@@ -10,5 +10,6 @@ router.get('/:videoId/stream', contentController.streamVideo);
 router.post('/:videoId/transcode', contentController.transcodeVideo);
 router.delete('/:videoId/delete', contentController.deleteVideo);
 router.get('/:courseId/videos', contentController.getCourseVideos); // New route
+router.post('/enroll/:courseId', contentController.enrollStudent);
 
 module.exports = router;
