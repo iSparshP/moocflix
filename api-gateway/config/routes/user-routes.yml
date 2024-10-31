@@ -1,0 +1,30 @@
+# user-routes.yml
+_format_version: "3.0"
+routes:
+  - name: user-auth
+    paths:
+      - /api/v1/users/signup
+      - /api/v1/users/login
+      - /api/v1/users/logout
+    strip_path: false
+    service: user-management
+    methods:
+      - POST
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+
+  - name: user-profile
+    paths:
+      - /api/v1/users/profile
+      - /api/v1/users/profile/update
+      - /api/v1/users/deactivate
+    strip_path: false
+    service: user-management
+    methods:
+      - GET
+      - PUT
+      - DELETE
+    plugins:
+      - name: jwt

@@ -1,0 +1,28 @@
+# notification-routes.yml
+_format_version: "3.0"
+routes:
+  - name: notification-send
+    paths:
+      - /api/v1/notifications/sendPush
+      - /api/v1/notifications/sendEmail
+    strip_path: false
+    service: notification
+    methods:
+      - POST
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 120
+
+  - name: notification-manage
+    paths:
+      - /api/v1/notifications/preferences
+      - /api/v1/notifications/history
+    strip_path: false
+    service: notification
+    methods:
+      - GET
+      - POST
+    plugins:
+      - name: jwt

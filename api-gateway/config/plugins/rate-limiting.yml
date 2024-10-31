@@ -1,28 +1,19 @@
-_format_version: "2.1"
-_transform: true
-
+_format_version: "3.0"
 plugins:
   - name: rate-limiting
-    service: user-management-service
     config:
-      minute: 100
-  - name: rate-limiting
-    service: course-management-service
-    config:
-      minute: 100
-  - name: rate-limiting
-    service: content-delivery-service
-    config:
-      minute: 100
-  - name: rate-limiting
-    service: assessment-service
-    config:
-      minute: 100
-  - name: rate-limiting
-    service: transcoding-service
-    config:
-      minute: 100
-  - name: rate-limiting
-    service: notification-service
-    config:
-      minute: 100
+      minute: 60 # Default rate limit
+      policy: local
+    routes:
+      - name: user-auth
+        config:
+          minute: 60 # Login/signup endpoints
+      - name: content-delivery
+        config:
+          minute: 120 # Video streaming endpoints
+      - name: notification-send
+        config:
+          minute: 120 # Notification endpoints
+      - name: course-management
+        config:
+          minute: 60 # Course CRUD endpoints

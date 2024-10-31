@@ -1,0 +1,17 @@
+# notification-management.yml
+services:
+  - name: notification
+    url: http://notification:3000
+    routes:
+      - name: notification-routes
+        paths:
+          - /api/v1/notifications/sendPush
+          - /api/v1/notifications/preferences
+          - /api/v1/notifications/sendEmail
+          - /api/v1/notifications/history
+        methods: [GET, POST]
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 120

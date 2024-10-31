@@ -1,0 +1,31 @@
+# content-routes.yml
+_format_version: "3.0"
+routes:
+  - name: content-upload
+    paths:
+      - /api/v1/content/upload
+    strip_path: false
+    service: content-delivery
+    methods:
+      - POST
+
+  - name: content-stream
+    paths:
+      - /api/v1/content/:videoId/stream
+      - /api/v1/content/:videoId
+    strip_path: false
+    service: content-delivery
+    methods:
+      - GET
+
+  - name: content-manage
+    paths:
+      - /api/v1/content/:videoId/transcode
+      - /api/v1/content/:videoId/delete
+      - /api/v1/content/:courseId/videos
+    strip_path: false
+    service: content-delivery
+    methods:
+      - GET
+      - POST
+      - DELETE

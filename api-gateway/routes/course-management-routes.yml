@@ -1,8 +1,0 @@
-_format_version: "2.1"
-_transform: true
-
-routes:
-  - name: course-management
-    paths:
-      - /api/v1/courses
-    service: course-management-service

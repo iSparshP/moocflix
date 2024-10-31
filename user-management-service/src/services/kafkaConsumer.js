@@ -1,72 +1,59 @@
-const { Kafka } = require('kafkajs');
+const { consumer } = require('../../config/kafka');
 const { handleUserCreation, handleUserUpdate } = require('./messageHandlers');
+const logger = require('../utils/logger');
+const { validateEventMessage } = require('../config/eventSchemas');
+const { AppError } = require('../utils/errorUtils');
 
-const kafka = new Kafka({
-    clientId: 'user-management-service-consumer',
-    brokers: [process.env.KAFKA_BROKER || 'kafka:9092'],
-});
-
-const consumer = kafka.consumer({
-    groupId: 'user-management-group',
-    retry: {
-        initialRetryTime: 100,
-        retries: 3,
-    },
-});
-
-const DLQ_TOPIC = 'dead-letter-queue';
+const messageHandlers = {
+    'User-Creation': handleUserCreation,
+    'User-Update': handleUserUpdate,
+};
 
 const processMessage = async (topic, message) => {
-    const handlers = {
-        'User-Creation': handleUserCreation,
-        'User-Update': handleUserUpdate,
-    };
+    const handler = messageHandlers[topic];
+    if (!handler) {
+        throw new AppError(`No handler found for topic: ${topic}`, 400);
+    }
 
+    // Validate message format
+    await validateEventMessage(topic, message);
+
+    // Execute handler with circuit breaker and retry
+    return await executeWithBreaker(() => executeWithRetry(handler, message));
+};
+
+const startConsumer = async () => {
     try {
-        const handler = handlers[topic];
-        if (!handler) {
-            throw new Error(`No handler found for topic: ${topic}`);
-        }
-
-        const parsedMessage = JSON.parse(message.value.toString());
-        await handler(parsedMessage);
-    } catch (error) {
-        // Send to Dead Letter Queue
-        const producer = kafka.producer();
-        await producer.connect();
-        await producer.send({
-            topic: DLQ_TOPIC,
-            messages: [
-                {
-                    value: JSON.stringify({
-                        originalTopic: topic,
-                        originalMessage: message.value.toString(),
-                        error: error.message,
-                        timestamp: new Date().toISOString(),
-                    }),
-                },
-            ],
+        await consumer.connect();
+        await consumer.subscribe({
+            topics: Object.keys(messageHandlers),
+            fromBeginning: true,
         });
-        await producer.disconnect();
+
+        await consumer.run({
+            eachMessage: async ({ topic, partition, message }) => {
+                try {
+                    const parsedMessage = JSON.parse(message.value.toString());
+                    await processMessage(topic, parsedMessage);
+
+                    logger.info('Message processed successfully', {
+                        topic,
+                        messageId: message.offset,
+                    });
+                } catch (error) {
+                    logger.error('Error processing message', {
+                        topic,
+                        error: error.message,
+                        partition,
+                        offset: message.offset,
+                    });
+                }
+            },
+        });
+    } catch (error) {
+        logger.error('Failed to start consumer', { error: error.message });
         throw error;
     }
 };
 
-const startConsumer = async () => {
-    await consumer.connect();
-
-    await consumer.subscribe({
-        topics: ['User-Creation', 'User-Update'],
-        fromBeginning: true,
-    });
-
-    await consumer.run({
-        eachMessage: async ({ topic, partition, message }) => {
-            await processMessage(topic, message);
-        },
-    });
-};
-
-module.exports = {
-    startConsumer,
-};
+module.exports = { startConsumer };

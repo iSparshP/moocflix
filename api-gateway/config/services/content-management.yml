@@ -1,0 +1,25 @@
+# content-management.yml
+services:
+  - name: content-delivery
+    url: http://content-delivery:3000
+    routes:
+      - name: content-upload
+        paths:
+          - /api/v1/content/upload
+        methods: [POST]
+      - name: content-stream
+        paths:
+          - /api/v1/content/:videoId/stream
+        methods: [GET]
+      - name: content-manage
+        paths:
+          - /api/v1/content/:videoId
+          - /api/v1/content/:videoId/transcode
+          - /api/v1/content/:videoId/delete
+          - /api/v1/content/:courseId/videos
+        methods: [GET, POST, DELETE]
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 120

@@ -1,8 +1,28 @@
-_format_version: "2.1"
+# course-management.yml
 services:
-  - name: course-management-service
-    url: http://course-management-service:3000
+  - name: course-management
+    url: http://course-management:3000
     routes:
-      - name: course-management-route
+      - name: course-crud
         paths:
-          - /api/v1/courses
+          - /api/v1/courses/create
+          - /api/v1/courses/:courseId
+          - /api/v1/courses/:courseId/update
+        methods: [GET, POST, PUT, DELETE]
+      - name: course-modules
+        paths:
+          - /api/v1/courses/:courseId/modules
+          - /api/v1/courses/:courseId/modules/create
+          - /api/v1/courses/:courseId/modules/:moduleId/update
+          - /api/v1/courses/:courseId/modules/:moduleId/delete
+        methods: [GET, POST, PUT, DELETE]
+      - name: course-enrollment
+        paths:
+          - /api/v1/courses/:courseId/enroll
+          - /api/v1/courses/:courseId/students
+        methods: [GET, POST]
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 60

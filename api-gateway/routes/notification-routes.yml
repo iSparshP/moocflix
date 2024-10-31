@@ -1,8 +1,0 @@
-_format_version: "2.1"
-_transform: true
-
-routes:
-  - name: notification
-    paths:
-      - /api/v1/notifications
-    service: notification-service

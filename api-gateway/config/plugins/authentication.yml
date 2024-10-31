@@ -1,0 +1,69 @@
+# authentication.yml
+_format_version: "3.0"
+plugins:
+  - name: jwt
+    config:
+      key_claim_name: kid
+      secret_is_base64: false
+      claims_to_verify:
+        - exp
+        - nbf
+      header_names:
+        - Authorization
+      maximum_expiration: 86400
+      cookie_names: []
+      uri_param_names: []
+      anonymous: null
+      run_on_preflight: true
+
+consumers:
+  - username: moocflix-frontend
+    custom_id: frontend-app
+    jwt_secrets:
+      - key: "moocflix-key"
+        algorithm: HS256
+        secret: "${JWT_SECRET}"
+
+  - username: moocflix-mobile
+    custom_id: mobile-app
+    jwt_secrets:
+      - key: "moocflix-mobile-key"
+        algorithm: HS256
+        secret: "${JWT_MOBILE_SECRET}"
+
+acls:
+  - consumer: moocflix-frontend
+    group: frontend
+  - consumer: moocflix-mobile
+    group: mobile
+
+routes:
+  - name: authentication
+    paths:
+      - /api/v1/auth
+    strip_path: false
+    service: user-management
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 30
+          hour: 500
+          policy: local
+      - name: cors
+        config:
+          origins: ["https://moocflix.tech"]
+          methods: ["POST"]
+          headers: ["Authorization", "Content-Type"]
+          credentials: true
+          max_age: 3600
+
+  - name: token-refresh
+    paths:
+      - /api/v1/auth/refresh
+    strip_path: false
+    service: user-management
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 10

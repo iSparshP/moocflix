@@ -1,28 +1,18 @@
-_format_version: "2.1"
-_transform: true
-
+_format_version: "3.0"
 plugins:
   - name: file-log
-    service: user-management-service
     config:
-      path: /usr/local/kong/logs/user-management.log
-  - name: file-log
-    service: course-management-service
+      path: /usr/local/kong/logs/access.log
+      reopen: true
+      custom_fields_by_lua:
+        service_name: "return kong.router.get_service().name"
+      custom_fields:
+        environment: production
+  - name: http-log
     config:
-      path: /usr/local/kong/logs/course-management.log
-  - name: file-log
-    service: content-delivery-service
-    config:
-      path: /usr/local/kong/logs/content-delivery.log
-  - name: file-log
-    service: assessment-service
-    config:
-      path: /usr/local/kong/logs/assessment.log
-  - name: file-log
-    service: transcoding-service
-    config:
-      path: /usr/local/kong/logs/transcoding.log
-  - name: file-log
-    service: notification-service
-    config:
-      path: /usr/local/kong/logs/notification.log
+      http_endpoint: http://logging:3000/logs
+      method: POST
+      timeout: 10000
+      keepalive: 60000
+      retry_count: 5
+      queue_size: 10000

@@ -1,8 +1,0 @@
-_format_version: "2.1"
-_transform: true
-
-routes:
-  - name: assessment
-    paths:
-      - /api/v1/assessments
-    service: assessment-service

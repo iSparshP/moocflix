@@ -1,9 +1,28 @@
-_format_version: "2.1"
+# user-management.yml
 services:
-  - name: user-management-service
-    url: http://user-management-service:3000
+  - name: user-management
+    url: http://user-management:3000
     routes:
-      - name: user-management-route
+      - name: auth-routes
         paths:
-          - /api/v1/users
-          - /api/v1/profile
+          - /api/v1/users/signup
+          - /api/v1/users/login
+          - /api/v1/users/logout
+        methods: [POST]
+      - name: profile-routes
+        paths:
+          - /api/v1/users/profile
+          - /api/v1/users/profile/update
+          - /api/v1/users/deactivate
+        methods: [GET, PUT, DELETE]
+      - name: validation-routes
+        paths:
+          - /api/v1/users/validate
+        methods: [GET]
+    plugins:
+      - name: jwt
+        config:
+          exclude_paths: ["/api/v1/users/signup", "/api/v1/users/login"]
+      - name: rate-limiting
+        config:
+          minute: 60
