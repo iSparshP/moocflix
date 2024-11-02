@@ -13,3 +13,4 @@
 
 # ignore all these folders
 /payment-service
+.DS_Store
