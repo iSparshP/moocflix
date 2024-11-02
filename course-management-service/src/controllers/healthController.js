@@ -1,6 +1,7 @@
 // src/controllers/healthController.js
 const mongoose = require('mongoose');
 const { kafka } = require('../utils/kafka');
+const logger = require('../utils/logger');
 
 exports.healthCheck = async (req, res) => {
     const health = {
@@ -24,6 +25,7 @@ exports.healthCheck = async (req, res) => {
             response_time: 'OK',
         };
     } catch (error) {
+        logger.error('Database health check failed:', { error: error.message });
         health.services.database = {
             status: 'unhealthy',
             type: 'mongodb',
@@ -41,6 +43,7 @@ exports.healthCheck = async (req, res) => {
             response_time: 'OK',
         };
     } catch (error) {
+        logger.error('Kafka health check failed:', { error: error.message });
         health.services.kafka = {
             status: 'unhealthy',
             type: 'kafka',
@@ -51,6 +54,11 @@ exports.healthCheck = async (req, res) => {
     const isHealthy = Object.values(health.services).every(
         (service) => service.status === 'healthy'
     );
+
+    logger.info('Health check completed', {
+        healthy: isHealthy,
+        services: health.services,
+    });
 
     res.status(isHealthy ? 200 : 503).json(health);
 };
