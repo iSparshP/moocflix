@@ -5,6 +5,7 @@ const { EventEmitter } = require('events');
 const { limits } = require('../config/resources');
 const { paths } = require('../config/env');
 const metricsPersistence = require('./metricsPersistence');
+const registry = require('./serviceRegistry');
 
 class MetricsService extends EventEmitter {
     constructor() {
@@ -37,6 +38,13 @@ class MetricsService extends EventEmitter {
             const metrics = this.getMetricsSummary();
             await metricsPersistence.persistMetrics(metrics);
         }, 60000); // Store every minute
+
+        registry.on('job:complete', this.handleJobComplete.bind(this));
+        registry.on('job:failed', this.handleJobFailed.bind(this));
+        registry.on(
+            'resources:allocated',
+            this.handleResourceAllocation.bind(this)
+        );
     }
 
     async init() {
@@ -227,6 +235,69 @@ class MetricsService extends EventEmitter {
 
     average(numbers) {
         return numbers.reduce((a, b) => a + b, 0) / numbers.length;
+    }
+
+    completeTranscodingJob(videoId, outputSize) {
+        const job = this.metrics.transcoding.get(videoId);
+        if (job) {
+            const duration = Date.now() - job.startTime;
+            transcodingMetrics.jobDuration.observe(
+                { profile: job.profile },
+                duration / 1000
+            );
+            this.metrics.transcoding.delete(videoId);
+        }
+    }
+
+    recordTranscodingError(videoId, error) {
+        transcodingMetrics.failureRate.inc({
+            reason:
+                error.name === 'TranscodingError' ? 'transcoding' : 'system',
+        });
+
+        const job = this.metrics.transcoding.get(videoId);
+        if (job) {
+            job.status = 'failed';
+            job.error = error.message;
+        }
+    }
+
+    collectQueueMetrics() {
+        const queue = registry.get('queue');
+        return {
+            queued: queue.getQueueStats(),
+            active: queue.activeJobs.size,
+            failed: queue.getFailedJobStats(),
+        };
+    }
+
+    collectResourceMetrics() {
+        const resources = registry.get('resources');
+        return {
+            allocated: resources.getResourceUtilization(),
+            system: this.collectSystemMetrics(),
+        };
+    }
+
+    // Centralize all metrics collection here
+    async collectAllMetrics() {
+        const metrics = {
+            system: await this.collectSystemMetrics(),
+            queue: await this.collectQueueMetrics(),
+            resources: await this.collectResourceMetrics(),
+            cleanup: await this.collectCleanupMetrics(),
+        };
+
+        await this.persistMetrics(metrics);
+        return metrics;
+    }
+
+    async collectCleanupMetrics() {
+        const cleanup = this.registry.get('cleanup');
+        return {
+            lastRun: await cleanup.getLastRunMetrics(),
+            storage: await cleanup.getStorageMetrics(),
+        };
     }
 }
 

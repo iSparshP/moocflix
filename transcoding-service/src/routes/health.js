@@ -117,55 +117,17 @@ const checkDiskSpace = async () => {
     }
 };
 
-router.get('/health', async (req, res) => {
-    try {
-        const [metrics, resources, kafkaStatus, diskStatus, queueHealth] =
-            await Promise.all([
-                metricsService.getMetricsSummary(),
-                metricsService.checkResources(),
-                checkKafkaConnection(),
-                checkDiskSpace(),
-                queue.getHealth(),
-            ]);
+router.get('/', async (req, res) => {
+    const registry = require('../utils/serviceRegistry');
+    const health = await registry.healthCheck();
 
-        const systemStatus = determineSystemStatus({
-            resources,
-            kafka: kafkaStatus,
-            disk: diskStatus,
-            queue: queueHealth,
-        });
+    const isHealthy = health.every((h) => h.status === 'healthy');
 
-        const health = {
-            status: systemStatus,
-            timestamp: new Date().toISOString(),
-            components: {
-                kafka: kafkaStatus,
-                storage: diskStatus,
-                queue: queueHealth,
-                resources: resourceManager.getResourceUtilization(),
-            },
-            metrics: {
-                current: resources.metrics,
-                thresholds: resources.thresholds,
-                history: metrics.history,
-            },
-            uptime: process.uptime(),
-        };
-
-        const httpStatus = determineHttpStatus(systemStatus);
-        res.status(httpStatus).json(health);
-    } catch (error) {
-        console.error('Health check failed:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Health check failed',
-            error:
-                process.env.NODE_ENV === 'production'
-                    ? undefined
-                    : error.message,
-            timestamp: new Date().toISOString(),
-        });
-    }
+    res.status(isHealthy ? 200 : 503).json({
+        status: isHealthy ? 'healthy' : 'unhealthy',
+        timestamp: new Date().toISOString(),
+        services: health,
+    });
 });
 
 router.get('/ready', async (req, res) => {

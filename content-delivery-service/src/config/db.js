@@ -1,21 +1,49 @@
 const redis = require('redis');
-const sequelize = require('./sequelize');
+const { Sequelize } = require('sequelize');
+const config = require('./config');
+const logger = require('../utils/logger');
 
-// Redis connection setup
-const redisClient = redis.createClient({
-    url: process.env.REDIS_URL,
-});
+class DatabaseManager {
+    constructor() {
+        this.sequelize = null;
+        this.redisClient = null;
+    }
 
-redisClient.on('connect', () => {
-    console.log('Connected to the Redis database');
-});
+    async initialize() {
+        try {
+            // Initialize Sequelize
+            this.sequelize = new Sequelize(config.db.url, config.db.options);
+            await this.sequelize.authenticate();
+            logger.info('PostgreSQL connection established');
 
-redisClient.on('error', (err) => {
-    console.error('Redis error', err);
-});
+            // Initialize Redis
+            this.redisClient = redis.createClient({
+                url: config.redis.url,
+            });
 
-redisClient.on('end', () => {
-    console.log('Redis client disconnected');
-});
+            this.redisClient.on('error', (err) => {
+                logger.error('Redis error:', err);
+            });
 
-module.exports = { sequelize, redisClient };
+            await this.redisClient.connect();
+            logger.info('Redis connection established');
+        } catch (error) {
+            logger.error('Failed to initialize database connections:', error);
+            throw error;
+        }
+    }
+
+    async close() {
+        try {
+            await this.sequelize?.close();
+            await this.redisClient?.quit();
+            logger.info('Database connections closed');
+        } catch (error) {
+            logger.error('Error closing database connections:', error);
+            throw error;
+        }
+    }
+}
+
+const dbManager = new DatabaseManager();
+module.exports = dbManager;

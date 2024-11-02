@@ -3,3 +3,8 @@
 /node_modules
 .DS_Store
 .env
+.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local   

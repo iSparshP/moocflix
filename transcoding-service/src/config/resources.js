@@ -17,6 +17,7 @@ const limits = {
         0.8
     ),
     maxCpuUsage: validateNumber(process.env.MAX_CPU_USAGE, 0.1, 0.95, 0.9),
+    maxDiskUsage: validateNumber(process.env.MAX_DISK_USAGE, 0.1, 0.95, 0.9),
     queueSizeLimit: {
         high: validateNumber(process.env.HIGH_QUEUE_LIMIT, 1, 1000, 100),
         normal: validateNumber(process.env.NORMAL_QUEUE_LIMIT, 1, 1000, 200),

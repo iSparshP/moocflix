@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: content-delivery-service
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app: content-delivery-service
+    template:
+        metadata:
+            labels:
+                app: content-delivery-service
+        spec:
+            containers:
+                - name: content-delivery-service
+                  image: content-delivery-service:latest
+                  resources:
+                      limits:
+                          cpu: '1'
+                          memory: '1Gi'
+                      requests:
+                          cpu: '500m'
+                          memory: '512Mi'
+                  livenessProbe:
+                      httpGet:
+                          path: /api/v1/health/liveness
+                          port: 3010
+                  readinessProbe:
+                      httpGet:
+                          path: /api/v1/health/readiness
+                          port: 3010
+                  ports:
+                      - containerPort: 3010
+                  env:
+                      - name: PORT
+                        value: '3010'

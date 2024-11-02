@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  transcoding-service:
+    build: .
+    ports:
+      - "3006:3006"
+      - "3001:3001"
+    volumes:
+      - ./videos/input:/app/temp/videos
+      - ./videos/output:/app/temp/processed
+    environment:
+      - NODE_ENV=production
+      - KAFKA_HOST=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - INPUT_VIDEO_PATH=/app/temp/videos
+      - OUTPUT_VIDEO_PATH=/app/temp/processed
+    depends_on:
+      - kafka
+      - redis
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:

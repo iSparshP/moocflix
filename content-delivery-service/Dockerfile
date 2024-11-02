@@ -1,12 +1,13 @@
-FROM node:14
-
+# Use multi-stage build
+FROM node:18-alpine AS builder
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm install
-
+RUN npm ci
 COPY . .
 
-EXPOSE 3000
-
+FROM node:18-alpine
+WORKDIR /app
+COPY --from=builder /app .
+USER node
 CMD ["node", "src/index.js"]
+EXPOSE 3010

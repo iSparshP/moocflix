@@ -5,8 +5,26 @@ const Joi = require('joi');
 const { ValidationError } = require('../middleware/errorHandler');
 const { TRANSCODING_PROFILES } = require('../constants/profiles');
 const { paths } = require('../config/env');
+const BaseService = require('./baseService');
 
-class ValidationService {
+class ValidationService extends BaseService {
+    constructor() {
+        super();
+        this.initializeSchemas();
+    }
+
+    async init() {
+        await super.init();
+        // Initialize validation rules
+        await this.loadCustomValidations();
+    }
+
+    async validateJob(data) {
+        const isValid = await super.validateJob(data);
+        this.emit('validation:complete', { jobId: data.videoId, isValid });
+        return isValid;
+    }
+
     // Allowed video formats
     static ALLOWED_FORMATS = ['mp4', 'mov', 'avi', 'mkv'];
 
@@ -48,31 +66,6 @@ class ValidationService {
         }
     }
 
-    validateJobParameters({ videoId, profile, priority }) {
-        // Validate videoId
-        if (!videoId || typeof videoId !== 'string' || videoId.length < 1) {
-            throw new ValidationError('Invalid or missing videoId');
-        }
-
-        // Validate profile
-        if (profile && !TRANSCODING_PROFILES[profile]) {
-            throw new ValidationError(
-                `Invalid profile. Available profiles: ${Object.keys(
-                    TRANSCODING_PROFILES
-                ).join(', ')}`
-            );
-        }
-
-        // Validate priority
-        if (priority && !['high', 'normal', 'low'].includes(priority)) {
-            throw new ValidationError(
-                'Invalid priority. Must be one of: high, normal, low'
-            );
-        }
-
-        return true;
-    }
-
     validateResourceRequirements(profile) {
         const selectedProfile = TRANSCODING_PROFILES[profile || 'default'];
 
@@ -85,23 +78,20 @@ class ValidationService {
         return estimatedResources;
     }
 
-    validateJobRequest(data) {
-        // Validate schema
-        const schema = Joi.object({
-            videoId: Joi.string().required(),
-            profile: Joi.string().valid('low', 'default', 'high'),
-            priority: Joi.string().valid('low', 'normal', 'high'),
-            metadata: Joi.object({
-                courseId: Joi.string(),
-                duration: Joi.number(),
-                format: Joi.string(),
-            }),
-        });
-
-        const { error } = schema.validate(data);
-        if (error) throw new ValidationError(error.message);
-
-        return true;
+    // Add method to validate output file
+    async validateOutputFile(videoId) {
+        const outputPath = path.join(paths.output, `${videoId}-transcoded.mp4`);
+        try {
+            const stats = await fs.stat(outputPath);
+            if (stats.size === 0) {
+                throw new ValidationError('Output file is empty');
+            }
+            return true;
+        } catch (error) {
+            throw new ValidationError(
+                `Output file validation failed: ${error.message}`
+            );
+        }
     }
 }
 

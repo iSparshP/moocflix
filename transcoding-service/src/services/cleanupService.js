@@ -5,6 +5,8 @@ const { paths } = require('../config/env');
 const logger = require('../utils/logger');
 const { register } = require('../utils/metrics');
 const TranscodingCircuitBreaker = require('../utils/circuitBreaker');
+const { registry } = require('../services/serviceRegistry');
+const BaseService = require('./baseService');
 
 const cleanupMetrics = {
     runs: new register.Counter({
@@ -26,13 +28,23 @@ const cleanupMetrics = {
     }),
 };
 
-class CleanupService {
+class CleanupService extends BaseService {
     constructor() {
-        this.retentionPeriod = process.env.TEMP_FILE_RETENTION_HOURS || 24;
-        this.maxSize = process.env.MAX_TEMP_STORAGE_GB || 10;
-        this.batchSize = process.env.CLEANUP_BATCH_SIZE || 100;
-        this.breaker = TranscodingCircuitBreaker.create('cleanup');
+        super();
+        this.initializeMetrics();
+    }
+
+    async init() {
+        await super.init();
         this.schedule = this.startCleanupSchedule();
+        this.emit('cleanup:initialized');
+    }
+
+    async shutdown() {
+        if (this.schedule) {
+            clearInterval(this.schedule);
+        }
+        await super.shutdown();
     }
 
     startCleanupSchedule() {
@@ -40,7 +52,7 @@ class CleanupService {
             (process.env.CLEANUP_INTERVAL_MINUTES || 30) * 60 * 1000;
         return setInterval(async () => {
             try {
-                await this.cleanupStaleFiles();
+                await this.cleanupAll();
             } catch (error) {
                 logger.error('Cleanup failed:', error);
             }
@@ -155,6 +167,39 @@ class CleanupService {
         }
 
         return metrics;
+    }
+
+    async cleanupStaleResources() {
+        const resourceManager = registry.get('resources');
+        const staleThreshold = Date.now() - 30 * 60 * 1000;
+
+        for (const [
+            jobId,
+            reservation,
+        ] of resourceManager.reservations.entries()) {
+            if (reservation.allocatedAt < staleThreshold) {
+                await resourceManager.releaseResources(jobId);
+            }
+        }
+    }
+
+    async cleanupAll() {
+        await Promise.all([
+            this.cleanupStaleFiles(),
+            this.cleanupStaleResources(),
+            this.cleanupFailedJobs(),
+        ]);
+    }
+
+    async cleanupFailedJobs() {
+        const queue = registry.get('queue');
+        const staleThreshold = Date.now() - 24 * 60 * 60 * 1000; // 24 hours
+
+        for (const [jobId, job] of queue.failedJobs.entries()) {
+            if (job.failedAt < staleThreshold) {
+                queue.failedJobs.delete(jobId);
+            }
+        }
     }
 }
 

@@ -4,11 +4,14 @@ const fs = require('fs').promises;
 const path = require('path');
 const { limits, retry } = require('../config/resources');
 const { ValidationError } = require('../middleware/errorHandler');
-const metricsService = require('./metricsService');
+const registry = require('../utils/serviceRegistry');
+const metricsService = registry.get('metrics');
 const TranscodingCircuitBreaker = require('../utils/circuitBreaker');
+const BaseService = require('./baseService');
 
-class PriorityQueue {
+class PriorityQueue extends BaseService {
     constructor() {
+        super();
         this.queues = {
             high: [],
             normal: [],
@@ -24,13 +27,13 @@ class PriorityQueue {
     async addJob(job, priority = 'normal') {
         return this.breaker.fire(async () => {
             if (this.paused) {
-                throw new ValidationError(
-                    'Queue is paused, not accepting new jobs'
-                );
+                throw new ValidationError('Queue is paused');
             }
 
-            if (!['high', 'normal', 'low'].includes(priority)) {
-                priority = 'normal';
+            if (
+                this.queues[priority].length >= limits.queueSizeLimit[priority]
+            ) {
+                throw new ValidationError(`Queue ${priority} is full`);
             }
 
             const jobWithRetry = {
@@ -41,27 +44,11 @@ class PriorityQueue {
                 attempts: job.attempts || 0,
                 priority,
                 addedAt: Date.now(),
-                metrics: {
-                    addedAt: Date.now(),
-                    retries: 0,
-                    duration: 0,
-                },
             };
-
-            if (
-                this.queues[priority].length >= limits.queueSizeLimit[priority]
-            ) {
-                throw new ValidationError(`Queue ${priority} is full`);
-            }
-
-            const resources = await metricsService.checkResources();
-            if (!resources.canAcceptMore && priority !== 'high') {
-                throw new ValidationError('System resources exhausted');
-            }
 
             this.queues[priority].push(jobWithRetry);
             await this.persistState();
-            return resources.metrics;
+            return jobWithRetry.id;
         });
     }
 
@@ -203,31 +190,47 @@ class PriorityQueue {
     resume() {
         this.paused = false;
     }
-}
 
-class CleanupService {
-    constructor() {
-        this.retentionPeriod = process.env.TEMP_FILE_RETENTION_HOURS || 24;
-        this.schedule = this.startCleanupSchedule();
-    }
+    getJobStatus(jobId) {
+        // Check active jobs
+        if (this.activeJobs.has(jobId)) {
+            return {
+                status: 'processing',
+                ...this.activeJobs.get(jobId),
+            };
+        }
 
-    startCleanupSchedule() {
-        const interval =
-            (process.env.CLEANUP_INTERVAL_MINUTES || 30) * 60 * 1000;
-        return setInterval(async () => {
-            try {
-                await this.cleanupStaleFiles();
-            } catch (error) {
-                logger.error('Cleanup failed:', error);
+        // Check queued jobs
+        for (const priority of ['high', 'normal', 'low']) {
+            const job = this.queues[priority].find((job) => job.id === jobId);
+            if (job) {
+                return {
+                    status: 'queued',
+                    ...job,
+                };
             }
-        }, interval);
+        }
+
+        // Check failed jobs
+        if (this.failedJobs.has(jobId)) {
+            return {
+                status: 'failed',
+                ...this.failedJobs.get(jobId),
+            };
+        }
+
+        return null;
     }
 
-    async cleanupStaleFiles() {
-        // Existing cleanup logic with metrics
-        const result = await super.cleanupStaleFiles();
-        metricsService.recordCleanup(result);
-        return result;
+    async init() {
+        await super.init();
+        await this.recover();
+        this.emit('queue:initialized');
+    }
+
+    async shutdown() {
+        await this.persistState();
+        await super.shutdown();
     }
 }
 

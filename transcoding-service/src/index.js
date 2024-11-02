@@ -18,6 +18,7 @@ const { errorHandler } = require('./middleware/errorHandler');
 const compression = require('compression');
 const timeout = require('connect-timeout');
 const { securityMiddleware } = require('./middleware/security');
+const registry = require('./utils/serviceRegistry');
 
 const app = express();
 const port = process.env.SERVICE_PORT || 3006;
@@ -157,16 +158,39 @@ function haltOnTimedout(req, res, next) {
     if (!req.timedout) next();
 }
 
-// Start server
-init().then((success) => {
-    if (success) {
-        app.listen(port, () => {
+async function startApplication() {
+    try {
+        // Initialize all services
+        await registry.initializeAll();
+
+        // Start HTTP server
+        const server = app.listen(port, () => {
             logger.info(`Service running on port ${port}`);
-        }).setTimeout(30000);
-    } else {
+        });
+
+        // Graceful shutdown
+        async function shutdown(signal) {
+            logger.info(`${signal} received, starting graceful shutdown`);
+
+            // Stop accepting new requests
+            server.close();
+
+            // Shutdown all services
+            await registry.shutdownAll();
+
+            process.exit(0);
+        }
+
+        // Handle shutdown signals
+        process.on('SIGTERM', () => shutdown('SIGTERM'));
+        process.on('SIGINT', () => shutdown('SIGINT'));
+    } catch (error) {
+        logger.error('Failed to start application:', error);
         process.exit(1);
     }
-});
+}
+
+startApplication();
 
 // Global error handling
 process.on('uncaughtException', (error) => {

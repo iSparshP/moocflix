@@ -5,10 +5,15 @@ const {
     ValidationError,
     ResourceError,
 } = require('../middleware/errorHandler');
-const metricsService = require('./metricsService');
+const fs = require('fs');
+const path = require('path');
+const registry = require('../utils/serviceRegistry');
+const BaseService = require('./baseService');
+const logger = require('../utils/logger');
 
-class ResourceManager {
+class ResourceManager extends BaseService {
     constructor() {
+        super();
         this.reservations = new Map();
         this.thresholds = {
             cpu: limits.maxCpuUsage,
@@ -17,10 +22,52 @@ class ResourceManager {
         };
     }
 
-    async allocateResources(jobId, requirements) {
-        const currentMetrics = await metricsService.checkResources();
+    async init() {
+        await super.init();
+        await this.loadState();
+        this.startMonitoring();
+    }
 
-        if (!this.canAllocate(currentMetrics.metrics, requirements)) {
+    async loadState() {
+        try {
+            const statePath = path.join(
+                process.cwd(),
+                'data',
+                'resource-state.json'
+            );
+
+            if (fs.existsSync(statePath)) {
+                const data = await fs.promises.readFile(statePath, 'utf8');
+                const state = JSON.parse(data);
+
+                this.reservations = new Map(state.reservations);
+                this.thresholds = state.thresholds;
+
+                logger.info('Resource state loaded successfully');
+            }
+        } catch (error) {
+            logger.error('Failed to load resource state', { error });
+            // Initialize with defaults if loading fails
+            this.reservations = new Map();
+        }
+    }
+
+    startMonitoring() {
+        setInterval(() => {
+            const metrics = this.getResourceUtilization();
+            this.emit('resources:metrics', metrics);
+        }, 5000);
+    }
+
+    async checkAndAllocate(jobId, requirements) {
+        return this.allocateResources(jobId, requirements);
+    }
+
+    async allocateResources(jobId, requirements) {
+        const metricsService = registry.get('metrics');
+        const canAllocate = await this.canAllocate(requirements);
+
+        if (!canAllocate) {
             throw new ResourceError('Insufficient system resources');
         }
 
@@ -28,7 +75,7 @@ class ResourceManager {
             ...requirements,
             allocatedAt: Date.now(),
         });
-
+        await this.persistState();
         return true;
     }
 
@@ -45,13 +92,14 @@ class ResourceManager {
         return released;
     }
 
-    canAllocate(currentMetrics, requirements) {
+    async canAllocate(requirements) {
+        const currentMetrics = await registry.get('metrics').checkResources();
         const totalReserved = this.calculateTotalReserved();
 
         return (
-            currentMetrics.cpu.utilization + requirements.cpu <=
+            currentMetrics.metrics.cpu.utilization + requirements.cpu <=
                 this.thresholds.cpu &&
-            currentMetrics.memory.used + requirements.memory <=
+            currentMetrics.metrics.memory.used + requirements.memory <=
                 this.thresholds.memory
         );
     }
@@ -74,21 +122,28 @@ class ResourceManager {
         };
     }
 
-    cleanup() {
-        const staleThreshold = Date.now() - 30 * 60 * 1000; // 30 minutes
-        for (const [jobId, reservation] of this.reservations.entries()) {
-            if (reservation.allocatedAt < staleThreshold) {
-                this.reservations.delete(jobId);
-            }
-        }
-    }
-
     async cleanupResources(jobId) {
         if (this.reservations.has(jobId)) {
             const resources = this.reservations.get(jobId);
             this.reservations.delete(jobId);
             await this.persistState();
             logger.info('Resources cleaned up', { jobId, resources });
+        }
+    }
+
+    async persistState() {
+        try {
+            const state = {
+                reservations: Array.from(this.reservations.entries()),
+                thresholds: this.thresholds,
+            };
+
+            await fs.writeFile(
+                path.join(process.cwd(), 'data', 'resource-state.json'),
+                JSON.stringify(state, null, 2)
+            );
+        } catch (error) {
+            logger.error('Failed to persist resource state', { error });
         }
     }
 }
