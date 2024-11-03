@@ -1,4 +1,41 @@
 const EventEmitter = require('events');
+const consul = require('consul')();
+const logger = require('./logger');
+const config = require('../config/env');
+
+const SERVICE_NAME = 'transcoding-service';
+const SERVICE_ID = `${SERVICE_NAME}-${process.env.HOSTNAME || 'local'}`;
+
+const registerService = async () => {
+    try {
+        await consul.agent.service.register({
+            name: SERVICE_NAME,
+            id: SERVICE_ID,
+            address: process.env.SERVICE_HOST || 'localhost',
+            port: parseInt(config.service.port),
+            tags: ['v1', 'transcoding'],
+            check: {
+                http: `http://localhost:${config.service.healthCheckPort}/health/live`,
+                interval: '15s',
+                timeout: '5s',
+                deregisterCriticalServiceAfter: '1m',
+            },
+        });
+        logger.info('Service registered with Consul');
+    } catch (error) {
+        logger.error('Failed to register service with Consul:', error);
+        throw error;
+    }
+};
+
+const deregisterService = async () => {
+    try {
+        await consul.agent.service.deregister(SERVICE_ID);
+        logger.info('Service deregistered from Consul');
+    } catch (error) {
+        logger.error('Failed to deregister service from Consul:', error);
+    }
+};
 
 class ServiceRegistry extends EventEmitter {
     constructor() {
@@ -99,4 +136,8 @@ registry.register('validation', require('../services/validationService'));
 registry.register('resources', require('../services/resourceManager'));
 registry.register('cleanup', require('../services/cleanupService'));
 
-module.exports = registry;
+module.exports = {
+    registry,
+    registerService,
+    deregisterService,
+};

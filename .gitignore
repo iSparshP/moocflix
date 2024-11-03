@@ -9,6 +9,7 @@
 /node_modules
 .env
 .env.docker
+.env.template
 # IDEs and editors
 
 # ignore all these folders

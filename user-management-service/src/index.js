@@ -164,7 +164,7 @@ let server;
 (async () => {
     try {
         await connectDB();
-        const PORT = process.env.PORT || 3000;
+        const PORT = process.env.PORT || 3007;
         server = app.listen(PORT, async () => {
             logger.info(`Server running on port ${PORT}`, {
                 env: process.env.NODE_ENV,

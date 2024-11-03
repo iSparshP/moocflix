@@ -1,7 +1,7 @@
 # user-management.yml
 services:
   - name: user-management
-    url: http://user-management:3000
+    url: http://user-management:3007
     routes:
       - name: auth-routes
         paths:

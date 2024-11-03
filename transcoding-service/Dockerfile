@@ -40,7 +40,7 @@ COPY wait-for-kafka.sh /wait-for-kafka.sh
 RUN chmod +x /wait-for-kafka.sh
 
 # Expose ports for the service and health check
-EXPOSE 3006 3001
+EXPOSE 3004 3001
 
 # Wait for Kafka to be ready before starting the service
 CMD ["/wait-for-kafka.sh", "node", "src/index.js"]

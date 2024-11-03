@@ -4,17 +4,26 @@ services:
   transcoding-service:
     build: .
     ports:
-      - "3006:3006"
+      - "3004:3004"
       - "3001:3001"
     volumes:
       - ./videos/input:/app/temp/videos
       - ./videos/output:/app/temp/processed
     environment:
       - NODE_ENV=production
+      - SERVICE_PORT=3004
       - KAFKA_HOST=kafka:9092
       - REDIS_URL=redis://redis:6379
       - INPUT_VIDEO_PATH=/app/temp/videos
       - OUTPUT_VIDEO_PATH=/app/temp/processed
+    networks:
+      - moocflix-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3004/api/v1/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
     depends_on:
       - kafka
       - redis
@@ -27,6 +36,8 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - moocflix-network
 
   redis:
     image: redis:alpine
@@ -34,6 +45,12 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    networks:
+      - moocflix-network
 
 volumes:
   redis-data:
+
+networks:
+  moocflix-network:
+    external: true

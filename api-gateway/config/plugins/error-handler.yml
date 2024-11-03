@@ -1,0 +1,6 @@
+_format_version: "3.0"
+plugins:
+  - name: response-transformer
+    config:
+      handle_unknown_status: true
+      error_template: '{"status": {{status}}, "message": "{{message}}"}'

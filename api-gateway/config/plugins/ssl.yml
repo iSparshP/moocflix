@@ -1,0 +1,7 @@
+_format_version: "3.0"
+plugins:
+  - name: ssl
+    config:
+      cert: /path/to/cert.pem
+      key: /path/to/key.pem
+      only_https: true

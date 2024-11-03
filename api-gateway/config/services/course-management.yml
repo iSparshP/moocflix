@@ -1,14 +1,21 @@
 # course-management.yml
 services:
   - name: course-management
-    url: http://course-management:3000
+    url: ${COURSE_SERVICE_URL}:${COURSE_SERVICE_PORT}
+    tags: ["v1", "production"]
+    retries: 5
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
     routes:
       - name: course-crud
         paths:
           - /api/v1/courses/create
           - /api/v1/courses/:courseId
           - /api/v1/courses/:courseId/update
+          - /api/v1/courses/:courseId/delete
         methods: [GET, POST, PUT, DELETE]
+        strip_path: false
       - name: course-modules
         paths:
           - /api/v1/courses/:courseId/modules
@@ -16,13 +23,29 @@ services:
           - /api/v1/courses/:courseId/modules/:moduleId/update
           - /api/v1/courses/:courseId/modules/:moduleId/delete
         methods: [GET, POST, PUT, DELETE]
+        strip_path: false
       - name: course-enrollment
         paths:
           - /api/v1/courses/:courseId/enroll
           - /api/v1/courses/:courseId/students
         methods: [GET, POST]
+        strip_path: false
     plugins:
       - name: jwt
       - name: rate-limiting
         config:
           minute: 60
+      - name: circuit-breaker
+        config:
+          timeout: 60000
+          threshold: 0.5
+          window_size: 60
+    healthchecks:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
+        http_path: /health

@@ -18,4 +18,7 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error' });
 });
 
+// Uses port from environment variable or 3002
+const port = process.env.PORT || 3002;
+
 module.exports = app;

@@ -1,0 +1,7 @@
+_format_version: "3.0"
+plugins:
+  - name: circuit-breaker
+    config:
+      metrics: true
+      threshold: 0.5
+      window_size: 60

@@ -13,6 +13,8 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cors = require('cors');
+const { registerService } = require('./utils/serviceRegistry');
 
 const initializeApp = async () => {
     try {
@@ -53,6 +55,20 @@ const initializeApp = async () => {
             );
         }
 
+        // Add CORS configuration
+        app.use(
+            cors({
+                origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+                    'https://moocflix.tech',
+                ],
+                methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+                allowedHeaders: ['Authorization', 'Content-Type'],
+                exposedHeaders: ['Content-Range', 'X-Content-Range'],
+                credentials: true,
+                maxAge: 3600,
+            })
+        );
+
         // Routes
         app.use('/api/v1/content', contentRoutes);
         app.use('/api/v1', healthRoutes);
@@ -60,9 +76,14 @@ const initializeApp = async () => {
         // Error handler
         app.use(errorHandler);
 
+        // Register service with Consul
+        await registerService();
+        console.log('Service registered with Consul');
+
         // Start server
-        app.listen(config.app.port, () => {
-            console.log(`Server running on port ${config.app.port}`);
+        const port = process.env.PORT || 3006;
+        app.listen(port, () => {
+            console.log(`Content delivery service running on port ${port}`);
         });
     } catch (error) {
         console.error('Failed to initialize application:', error);

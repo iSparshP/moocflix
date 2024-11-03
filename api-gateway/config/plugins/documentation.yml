@@ -1,0 +1,6 @@
+_format_version: "3.0"
+plugins:
+  - name: openapi-specification
+    config:
+      specification_url: "/api-docs"
+      include_root_endpoints: true

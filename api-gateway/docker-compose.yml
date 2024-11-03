@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  api-gateway:
+    build: .
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+    environment:
+      - CONTENT_SERVICE_URL=http://content-delivery
+      - CONTENT_SERVICE_PORT=3006
+    depends_on:
+      - content-delivery
+      - consul
+    networks:
+      - moocflix-network
+
+  content-delivery:
+    build: ../content-delivery-service
+    environment:
+      - PORT=3006
+      - NODE_ENV=production
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+    depends_on:
+      - consul
+      - redis
+      - postgres
+      - kafka
+    networks:
+      - moocflix-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3006/api/v1/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  notification-service:
+    build: ../notification-service
+    environment:
+      - PORT=3003
+      - HOST=notification-service
+      - NODE_ENV=production
+      - KAFKA_BROKERS=kafka:9092
+      - DATABASE_URL=postgres://user:pass@postgres:5432/notifications
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+    depends_on:
+      - kafka
+      - postgres
+      - consul
+    networks:
+      - moocflix-network
+
+  consul:
+    image: consul:latest
+    ports:
+      - "8500:8500"
+    networks:
+      - moocflix-network
+
+networks:
+  moocflix-network:
+    driver: bridge

@@ -1,7 +1,7 @@
 # notification-management.yml
 services:
   - name: notification
-    url: http://notification:3000
+    url: http://notification:3003
     routes:
       - name: notification-routes
         paths:

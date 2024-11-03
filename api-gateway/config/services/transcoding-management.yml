@@ -1,0 +1,38 @@
+services:
+  - name: transcoding-service
+    url: ${TRANSCODING_SERVICE_URL}:${TRANSCODING_SERVICE_PORT}
+    tags: ["v1", "production"]
+    retries: 5
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    routes:
+      - name: transcode-video
+        paths:
+          - /api/v1/transcode
+        methods: [POST]
+        strip_path: false
+      - name: transcode-status
+        paths:
+          - /api/v1/transcode/:jobId/status
+        methods: [GET]
+        strip_path: false
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 60
+      - name: circuit-breaker
+        config:
+          timeout: 60000
+          threshold: 0.5
+          window_size: 60
+    healthchecks:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
+        http_path: /api/v1/health/liveness

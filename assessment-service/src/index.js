@@ -54,8 +54,8 @@ app.get('/health/detailed', healthCheckLimiter, async (req, res) => {
 });
 
 connectDB();
-app.listen(process.env.PORT || 3000, () => {
-    logger.info(`Server is running on port ${process.env.PORT || 3000}`);
+app.listen(process.env.PORT || 3001, () => {
+    logger.info(`Server is running on port ${process.env.PORT || 3001}`);
 });
 
 // Handle uncaught exceptions

@@ -50,6 +50,33 @@ services:
       timeout: 10s
       retries: 3
 
+  consul:
+    image: consul:latest
+    ports:
+      - "8500:8500"
+    networks:
+      - moocflix-network
+
+  elasticsearch:
+    image: elasticsearch:7.9.3
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: kibana:7.9.3
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: elastic/filebeat:7.9.3
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
   # Application Services
   api-gateway:
     build: ./api-gateway

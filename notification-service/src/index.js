@@ -8,9 +8,10 @@ const errorHandler = require('./middlewares/errorHandler');
 const { sequelize } = require('./models/Notification');
 const { requestCounter } = require('./middlewares/metrics');
 const requestLogger = require('./middlewares/requestLogger');
+const { registerService } = require('./utils/serviceRegistry');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3003;
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
@@ -43,10 +44,22 @@ process.on('uncaughtException', (error) => {
     process.exit(1);
 });
 
-await sequelize.authenticate();
-console.log('Database connection established successfully.');
+const startServer = async () => {
+    try {
+        await sequelize.authenticate();
+        console.log('Database connection established successfully.');
 
-app.listen(port, () => {
-    console.log(`Notification service running on port ${port}`);
-    kafkaConsumer.start();
-});
+        await registerService();
+        console.log('Service registered with Consul');
+
+        app.listen(port, () => {
+            console.log(`Notification service running on port ${port}`);
+            kafkaConsumer.start();
+        });
+    } catch (error) {
+        console.error('Error starting server:', error);
+        process.exit(1);
+    }
+};
+
+startServer();

@@ -1,0 +1,8 @@
+_format_version: "3.0"
+plugins:
+  - name: consul
+    config:
+      host: consul
+      port: 8500
+      register: true
+      token: your-consul-token

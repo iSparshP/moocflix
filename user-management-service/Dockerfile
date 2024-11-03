@@ -26,7 +26,7 @@ RUN chmod -R 550 /app \
 
 # Set environment variables
 ENV NODE_ENV=production \
-    PORT=3000 \
+    PORT=3007 \
     # Add security headers
     SECURITY_HEADERS=true \
     # Increase heap size for larger workloads

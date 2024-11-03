@@ -1,16 +1,23 @@
 # content-management.yml
 services:
   - name: content-delivery
-    url: http://content-delivery:3000
+    url: ${CONTENT_SERVICE_URL}:${CONTENT_SERVICE_PORT}
+    tags: ["v1", "production"]
+    retries: 5
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
     routes:
       - name: content-upload
         paths:
           - /api/v1/content/upload
         methods: [POST]
+        strip_path: false
       - name: content-stream
         paths:
           - /api/v1/content/:videoId/stream
         methods: [GET]
+        strip_path: false
       - name: content-manage
         paths:
           - /api/v1/content/:videoId
@@ -18,8 +25,19 @@ services:
           - /api/v1/content/:videoId/delete
           - /api/v1/content/:courseId/videos
         methods: [GET, POST, DELETE]
+        strip_path: false
     plugins:
       - name: jwt
       - name: rate-limiting
         config:
           minute: 120
+      - name: proxy-cache
+        config:
+          content_type: ["video/mp4"]
+          cache_ttl: 3600
+          strategy: memory
+      - name: circuit-breaker
+        config:
+          timeout: 60000
+          threshold: 0.5
+          window_size: 60

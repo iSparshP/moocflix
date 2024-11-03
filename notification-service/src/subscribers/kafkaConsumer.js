@@ -157,3 +157,16 @@ exports.start = async () => {
         process.exit(1);
     }
 };
+
+exports.isConnected = async () => {
+    try {
+        const admin = kafka.admin();
+        await admin.connect();
+        await admin.listTopics();
+        await admin.disconnect();
+        return true;
+    } catch (error) {
+        console.error('Kafka connection check failed:', error);
+        return false;
+    }
+};

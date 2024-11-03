@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: Kong Dashboard
+    folder: API Gateway
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

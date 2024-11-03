@@ -21,7 +21,8 @@ const { securityMiddleware } = require('./middleware/security');
 const registry = require('./utils/serviceRegistry');
 
 const app = express();
-const port = process.env.SERVICE_PORT || 3006;
+const port = process.env.SERVICE_PORT || 3004;
+const healthCheckPort = process.env.HEALTH_CHECK_PORT || 3001;
 
 // Initialize queue processors
 let queueProcessors = [];

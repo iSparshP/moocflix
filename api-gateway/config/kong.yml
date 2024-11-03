@@ -1,0 +1,128 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: user-management
+    url: ${USER_SERVICE_URL}:${USER_SERVICE_PORT}
+    tags: ["v1", "production"]
+    version: "1.0"
+    routes:
+      - name: user-routes
+        paths:
+          - /api/v1/users
+    healthcheck:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
+
+  - name: course-management
+    url: ${COURSE_SERVICE_URL}:${COURSE_SERVICE_PORT}
+    routes:
+      - name: course-routes
+        paths:
+          - /api/v1/courses
+    healthcheck:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
+
+  - name: content-delivery
+    url: ${CONTENT_SERVICE_URL}:${CONTENT_SERVICE_PORT}
+    tags: ["v1", "production"]
+    version: "1.0"
+    routes:
+      - name: content-routes
+        paths:
+          - /api/v1/content
+        methods: [GET, POST, DELETE]
+    healthcheck:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
+        http_path: /api/v1/health/liveness
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 120
+      - name: proxy-cache
+        config:
+          content_type: ["video/mp4"]
+          cache_ttl: 3600
+          strategy: memory
+      - name: circuit-breaker
+        config:
+          timeout: 60000
+          threshold: 0.5
+          window_size: 60
+
+  - name: notification
+    url: ${NOTIFICATION_SERVICE_URL}:${NOTIFICATION_SERVICE_PORT}
+    tags: ["v1", "production"]
+    version: "1.0"
+    routes:
+      - name: notification-routes
+        paths:
+          - /api/v1/notifications
+        methods: [GET, POST]
+    healthcheck:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
+        http_path: /health
+    plugins:
+      - name: jwt
+      - name: rate-limiting
+        config:
+          minute: 120
+      - name: circuit-breaker
+        config:
+          timeout: 60000
+          threshold: 0.5
+          window_size: 60
+
+  - name: assessment
+    url: ${ASSESSMENT_SERVICE_URL}:${ASSESSMENT_SERVICE_PORT}
+    routes:
+      - name: assessment-routes
+        paths:
+          - /api/v1/assessments
+    healthcheck:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
+
+  - name: transcoding
+    url: ${TRANSCODING_SERVICE_URL}:${TRANSCODING_SERVICE_PORT}
+    routes:
+      - name: transcoding-routes
+        paths:
+          - /api/v1/transcoding
+    healthcheck:
+      active:
+        healthy:
+          interval: 5
+          successes: 1
+        unhealthy:
+          interval: 5
+          failures: 3
