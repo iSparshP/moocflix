@@ -11,7 +11,12 @@ const {
     validateAssignmentSubmission,
     validateGrading,
 } = require('../middlewares/validation');
-const submissionLimiter = require('../middlewares/rateLimiter');
+const {
+    apiLimiter,
+    writeLimiter,
+    sensitiveOpLimiter,
+    submissionLimiter,
+} = require('../middlewares/rateLimiter');
 const router = express.Router();
 
 /**
@@ -54,6 +59,7 @@ const router = express.Router();
  */
 router.post(
     '/api/v1/assessments/:courseId/assignment/create',
+    writeLimiter,
     validateAssignmentCreation,
     validateRequest,
     createAssignment
@@ -142,6 +148,7 @@ router.post(
  */
 router.get(
     '/api/v1/assessments/:courseId/assignment/:assignmentId/result',
+    apiLimiter,
     validateRequest,
     getAssignmentResult
 );
@@ -196,12 +203,10 @@ router.get(
  */
 router.post(
     '/api/v1/assessments/:courseId/assignment/:assignmentId/grade',
+    sensitiveOpLimiter,
     validateGrading,
     validateRequest,
     gradeAssignment
 );
-
-// Error handling
-router.use(errorHandler);
 
 module.exports = router;

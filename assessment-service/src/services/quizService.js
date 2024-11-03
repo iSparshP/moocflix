@@ -66,8 +66,9 @@ exports.gradeQuizSubmission = async (quizId, submissionId, grade) => {
         throw new ValidationError('Submission does not match quiz ID');
     }
 
-    await Submission.updateOne(
-        { quizId, _id: submissionId },
-        { $set: { grade, gradedAt: new Date() } }
-    );
+    submission.grade = grade;
+    submission.gradedAt = new Date();
+    await submission.save();
+
+    return submission;
 };

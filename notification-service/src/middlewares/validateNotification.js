@@ -1,63 +1,70 @@
-module.exports = (req, res, next) => {
+const validateNotification = (req, res, next) => {
     const { userId, title, body, token, email, subject, preferences } =
         req.body;
 
-    if (req.path === '/api/v1/notifications/sendPush') {
-        // Validate push notification request
+    // Validate push notifications
+    if (req.path === '/sendPush') {
         if (!userId || !title || !body || !token) {
-            return res
-                .status(400)
-                .json({
-                    message: 'Missing required fields for push notification',
-                });
-        }
-    } else if (req.path === '/api/v1/notifications/sendEmail') {
-        // Validate email notification request
-        if (!userId || !email || !subject || !body) {
-            return res
-                .status(400)
-                .json({
-                    message: 'Missing required fields for email notification',
-                });
-        }
-    } else if (req.path === '/api/v1/notifications/preferences') {
-        // Validate preferences update request
-        if (!userId || !preferences) {
-            return res
-                .status(400)
-                .json({
-                    message: 'Missing required fields for preferences update',
-                });
-        }
-    } else {
-        // Validate other requests
-        const { topic, messages } = req.body;
-        if (!topic) {
-            return res.status(400).json({ message: 'Topic is required' });
-        }
-
-        if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return res.status(400).json({
-                message: 'Messages array is required and cannot be empty',
+                status: 'error',
+                message: 'Missing required fields for push notification',
+                required: ['userId', 'title', 'body', 'token'],
+            });
+        }
+    }
+
+    // Validate email notifications
+    if (req.path === '/sendEmail') {
+        if (!userId || !email || !subject || !body) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Missing required fields for email notification',
+                required: ['userId', 'email', 'subject', 'body'],
             });
         }
 
-        for (const message of messages) {
-            if (!message.value) {
-                return res
-                    .status(400)
-                    .json({ message: 'Each message must have a value' });
-            }
+        // Basic email format validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Invalid email format',
+            });
+        }
+    }
 
-            try {
-                JSON.parse(message.value);
-            } catch (error) {
-                return res.status(400).json({
-                    message: 'Each message value must be a valid JSON string',
-                });
-            }
+    // Validate preference updates
+    if (req.path === '/preferences') {
+        if (!userId || !preferences) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Missing required fields for preference update',
+                required: ['userId', 'preferences'],
+            });
+        }
+
+        if (typeof preferences !== 'object') {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Preferences must be an object',
+            });
+        }
+
+        const validPreferences = ['email', 'push'];
+        const hasInvalidPreference = Object.keys(preferences).some(
+            (key) => !validPreferences.includes(key)
+        );
+
+        if (hasInvalidPreference) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Invalid preference type',
+                validTypes: validPreferences,
+            });
         }
     }
 
     next();
 };
+
+module.exports = validateNotification;

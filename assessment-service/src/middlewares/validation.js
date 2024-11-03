@@ -1,4 +1,8 @@
 const { body, param, validationResult } = require('express-validator');
+const {
+    commonValidations,
+    submissionValidations,
+} = require('../utils/validationSchemas');
 
 // Generic request validator
 exports.validateRequest = (req, res, next) => {
@@ -46,12 +50,8 @@ exports.validateQuizCreation = [
 ];
 
 exports.validateQuizSubmission = [
-    param('quizId').isMongoId().withMessage('Invalid quiz ID format'),
-    param('courseId').isMongoId().withMessage('Invalid course ID format'),
-    body('studentId')
-        .notEmpty()
-        .isString()
-        .withMessage('Student ID is required'),
+    commonValidations.courseId,
+    commonValidations.studentId,
     body('responses').isArray().withMessage('Responses must be an array'),
     body('responses.*.questionId')
         .isString()
@@ -90,13 +90,7 @@ exports.validateAssignmentSubmission = [
 ];
 
 exports.validateGrading = [
-    param('assignmentId')
-        .isMongoId()
-        .withMessage('Invalid assignment ID format'),
-    body('submissionId')
-        .isMongoId()
-        .withMessage('Invalid submission ID format'),
-    body('grade')
-        .isFloat({ min: 0, max: 100 })
-        .withMessage('Grade must be between 0 and 100'),
+    commonValidations.courseId,
+    submissionValidations.submissionId,
+    submissionValidations.grade,
 ];

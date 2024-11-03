@@ -17,12 +17,18 @@ const {
     validateQuizSubmission,
     validateGrading,
 } = require('../middlewares/validation');
-const submissionLimiter = require('../middlewares/rateLimiter');
+const {
+    apiLimiter,
+    writeLimiter,
+    sensitiveOpLimiter,
+    submissionLimiter,
+} = require('../middlewares/rateLimiter');
+const { ROUTES } = require('../config/constants');
 const router = express.Router();
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quiz/create:
+ * {ROUTES.QUIZ.CREATE}:
  *   post:
  *     summary: Create a new quiz
  *     tags: [Quiz]
@@ -59,7 +65,8 @@ const router = express.Router();
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post(
-    '/api/v1/assessments/:courseId/quiz/create',
+    ROUTES.QUIZ.CREATE,
+    writeLimiter,
     validateQuizCreation,
     validateRequest,
     createQuiz
@@ -67,7 +74,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quizzes:
+ * {ROUTES.QUIZ.LIST}:
  *   get:
  *     summary: Get all quizzes for a course
  *     tags: [Quiz]
@@ -89,15 +96,11 @@ router.post(
  *               items:
  *                 $ref: '#/components/schemas/Quiz'
  */
-router.get(
-    '/api/v1/assessments/:courseId/quizzes',
-    validateRequest,
-    getQuizzes
-);
+router.get(ROUTES.QUIZ.LIST, apiLimiter, validateRequest, getQuizzes);
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quiz/{quizId}/submit:
+ * {ROUTES.QUIZ.SUBMIT}:
  *   post:
  *     summary: Submit a quiz attempt
  *     tags: [Submissions]
@@ -127,7 +130,7 @@ router.get(
  *         description: Too many submissions
  */
 router.post(
-    '/api/v1/assessments/:courseId/quiz/:quizId/submit',
+    ROUTES.QUIZ.SUBMIT,
     submissionLimiter,
     validateRequest,
     validateQuizSubmission,
@@ -136,7 +139,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quiz/{quizId}/results:
+ * {ROUTES.QUIZ.RESULTS}:
  *   get:
  *     summary: Get quiz results
  *     tags: [Submissions]
@@ -157,15 +160,11 @@ router.post(
  *       200:
  *         description: Quiz results
  */
-router.get(
-    '/api/v1/assessments/:courseId/quiz/:quizId/results',
-    validateRequest,
-    getQuizResults
-);
+router.get(ROUTES.QUIZ.RESULTS, apiLimiter, validateRequest, getQuizResults);
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quiz/{quizId}/submissions:
+ * {ROUTES.QUIZ.SUBMISSIONS}:
  *   get:
  *     summary: Get all submissions for a quiz
  *     tags: [Submissions]
@@ -187,14 +186,15 @@ router.get(
  *         description: List of submissions
  */
 router.get(
-    '/api/v1/assessments/:courseId/quiz/:quizId/submissions',
+    ROUTES.QUIZ.SUBMISSIONS,
+    apiLimiter,
     validateRequest,
     getQuizSubmissions
 );
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quiz/{quizId}/submission/{submissionId}:
+ * {ROUTES.QUIZ.SUBMISSION_DETAIL}:
  *   get:
  *     summary: Get details of a specific submission
  *     tags: [Submissions]
@@ -221,14 +221,15 @@ router.get(
  *         description: Submission details
  */
 router.get(
-    '/api/v1/assessments/:courseId/quiz/:quizId/submission/:submissionId',
+    ROUTES.QUIZ.SUBMISSION_DETAIL,
+    apiLimiter,
     validateRequest,
     getSubmissionDetails
 );
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quiz/{quizId}:
+ * {ROUTES.QUIZ.BASE}:
  *   delete:
  *     summary: Delete a quiz
  *     tags: [Quiz]
@@ -274,20 +275,12 @@ router.get(
  *       200:
  *         description: Quiz updated successfully
  */
-router.delete(
-    '/api/v1/assessments/:courseId/quiz/:quizId',
-    validateRequest,
-    deleteQuiz
-);
-router.put(
-    '/api/v1/assessments/:courseId/quiz/:quizId',
-    validateRequest,
-    updateQuiz
-);
+router.delete(ROUTES.QUIZ.BASE, writeLimiter, validateRequest, deleteQuiz);
+router.put(ROUTES.QUIZ.BASE, writeLimiter, validateRequest, updateQuiz);
 
 /**
  * @swagger
- * /api/v1/assessments/{courseId}/quiz/{quizId}/grade:
+ * {ROUTES.QUIZ.GRADE}:
  *   post:
  *     summary: Grade a quiz submission
  *     tags: [Grading]
@@ -325,12 +318,11 @@ router.put(
  *         description: Quiz graded successfully
  */
 router.post(
-    '/api/v1/assessments/:courseId/quiz/:quizId/grade',
+    ROUTES.QUIZ.GRADE,
+    sensitiveOpLimiter,
     validateRequest,
+    validateGrading,
     gradeQuiz
 );
-
-// Error handling
-router.use(errorHandler);
 
 module.exports = router;

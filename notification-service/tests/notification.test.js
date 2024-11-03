@@ -1,5 +1,14 @@
 const request = require('supertest');
 const app = require('../src/index');
+const { sequelize } = require('../src/models/Notification');
+
+beforeAll(async () => {
+    await sequelize.sync({ force: true });
+});
+
+afterAll(async () => {
+    await sequelize.close();
+});
 
 describe('Notification API', () => {
     it('should send a push notification', async () => {

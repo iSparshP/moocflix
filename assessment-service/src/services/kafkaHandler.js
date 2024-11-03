@@ -1,11 +1,12 @@
 // src/services/kafkaHandler.js
-const { send: sendMessage, consumeMessages } = require('../../config/kafka');
+const { send: sendMessage, consumeMessages } = require('../config/kafka');
 const { Quiz } = require('../models/quizModel');
 const { Assignment } = require('../models/assignmentModel');
 const { Submission } = require('../models/submissionModel');
 const { AssignmentSubmission } = require('../models/assignmentSubmissionModel');
 const { validateUser } = require('./userService');
 const { validateCourseId } = require('./courseService');
+const { logger } = require('../config/logger');
 
 const handleIncomingMessage = async (topic, message) => {
     try {
@@ -44,10 +45,10 @@ const handleIncomingMessage = async (topic, message) => {
                 await handleAssignmentSubmission(message);
                 break;
             default:
-                console.log(`Unhandled topic: ${topic}`);
+                logger.info(`Unhandled topic: ${topic}`);
         }
     } catch (error) {
-        console.error(`Error handling message for topic ${topic}:`, error);
+        logger.error(`Error handling message for topic ${topic}:`, error);
         await sendMessage('assessment-dlq', {
             topic,
             message,
@@ -59,7 +60,7 @@ const handleIncomingMessage = async (topic, message) => {
 const handleUserCreation = async (message) => {
     const { userId, role } = message;
     if (role === 'instructor' || role === 'student') {
-        console.log(`New ${role} created with ID: ${userId}`);
+        logger.info(`New ${role} created with ID: ${userId}`);
     }
 };
 
@@ -67,7 +68,7 @@ const handleUserUpdate = async (message) => {
     const { userId, updates } = message;
     const isValidUser = await validateUser(userId);
     if (isValidUser) {
-        console.log(`User ${userId} updated with:`, updates);
+        logger.info(`User ${userId} updated with:`, updates);
     }
 };
 
@@ -75,7 +76,7 @@ const handleCourseCreation = async (message) => {
     const { courseId, instructorId } = message;
     const isValidInstructor = await validateUser(instructorId);
     if (isValidInstructor) {
-        console.log(
+        logger.info(
             `New course ${courseId} created by instructor ${instructorId}`
         );
     }
@@ -85,7 +86,7 @@ const handleCourseUpdate = async (message) => {
     const { courseId, updates } = message;
     const isValidCourse = await validateCourseId(courseId);
     if (isValidCourse) {
-        console.log(`Course ${courseId} updated with:`, updates);
+        logger.info(`Course ${courseId} updated with:`, updates);
     }
 };
 
@@ -97,7 +98,7 @@ const handleCourseDeletion = async (message) => {
         Submission.deleteMany({ courseId }),
         AssignmentSubmission.deleteMany({ courseId }),
     ]);
-    console.log(`Course ${courseId} and all associated data deleted`);
+    logger.info(`Course ${courseId} and all associated data deleted`);
 };
 
 const handleStudentEnrollment = async (message) => {
@@ -121,28 +122,28 @@ const handleStudentEnrollment = async (message) => {
 
 const handleAssessmentCreation = async (message) => {
     const { courseId, assessmentId, type } = message;
-    console.log(
+    logger.info(
         `New ${type} created for course ${courseId} with ID ${assessmentId}`
     );
 };
 
 const handleSubmissionCompleted = async (message) => {
     const { courseId, assessmentId, submissionId, studentId } = message;
-    console.log(
+    logger.info(
         `New submission ${submissionId} received for assessment ${assessmentId}`
     );
 };
 
 const handleGradingCompleted = async (message) => {
     const { assessmentId, submissionId, grade } = message;
-    console.log(
+    logger.info(
         `Grading completed for submission ${submissionId} with grade ${grade}`
     );
 };
 
 const handleTranscodingCompleted = async (message) => {
     const { courseId, contentId, url } = message;
-    console.log(
+    logger.info(
         `Content ${contentId} for course ${courseId} transcoded. URL: ${url}`
     );
 };
@@ -158,25 +159,28 @@ const handleAssignmentSubmission = async (message) => {
     });
 };
 
-const initializeKafkaConsumer = () => {
-    const topics = [
-        'User-Creation',
-        'User-Update',
-        'Course-Creation',
-        'Course-Update',
-        'Course-Deletion',
-        'Student-Enrolled',
-        'Assessment-Creation',
-        'Submission-Completed',
-        'Grading-Completed',
-        'Transcoding-Completed',
-        'AssignmentSubmitted',
-    ];
+const initializeKafkaConsumer = async () => {
+    try {
+        const topics = [
+            'User-Creation',
+            'User-Update',
+            'Course-Creation',
+            'Course-Update',
+            'Course-Deletion',
+            'Student-Enrolled',
+            'Assessment-Creation',
+            'Submission-Completed',
+            'Grading-Completed',
+            'Transcoding-Completed',
+            'AssignmentSubmitted',
+        ];
 
-    consumeMessages(topics, handleIncomingMessage).catch((error) => {
-        console.error('Failed to initialize Kafka consumer:', error);
+        await consumeMessages(topics, handleIncomingMessage);
+        logger.info('Kafka consumer initialized successfully');
+    } catch (error) {
+        logger.error('Failed to initialize Kafka consumer:', error);
         process.exit(1);
-    });
+    }
 };
 
 module.exports = {

@@ -1,53 +1,38 @@
 // src/utils/errors.js
 class BaseError extends Error {
-    constructor(message, statusCode) {
+    constructor(message, statusCode = 500, status = 'error') {
         super(message);
         this.statusCode = statusCode;
-        this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
-        this.isOperational = true;
+        this.status = status;
+        this.name = this.constructor.name;
         Error.captureStackTrace(this, this.constructor);
-    }
-}
-
-class ValidationError extends BaseError {
-    constructor(message) {
-        super(message, 400);
-        this.name = 'ValidationError';
-    }
-}
-
-class NotFoundError extends BaseError {
-    constructor(resource) {
-        super(`${resource} not found`, 404);
-        this.name = 'NotFoundError';
-    }
-}
-
-class AuthorizationError extends BaseError {
-    constructor(message = 'Unauthorized access') {
-        super(message, 401);
-        this.name = 'AuthorizationError';
-    }
-}
-
-class DuplicateError extends BaseError {
-    constructor(resource) {
-        super(`${resource} already exists`, 409);
-        this.name = 'DuplicateError';
     }
 }
 
 class ServiceError extends BaseError {
     constructor(service, message) {
-        super(`${service} service error: ${message}`, 503);
+        super(`${service} Service Error: ${message}`, 503);
         this.name = 'ServiceError';
     }
 }
 
+class NotFoundError extends BaseError {
+    constructor(message) {
+        super(message, 404, 'fail');
+        this.name = 'NotFoundError';
+    }
+}
+
+class ValidationError extends BaseError {
+    constructor(message) {
+        super(message, 400, 'fail');
+        this.name = 'ValidationError';
+    }
+}
+
 module.exports = {
-    ValidationError,
-    NotFoundError,
-    AuthorizationError,
-    DuplicateError,
+    BaseError,
     ServiceError,
+    NotFoundError,
+    ValidationError,
 };

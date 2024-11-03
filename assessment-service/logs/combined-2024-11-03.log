@@ -1,0 +1,11 @@
+2024-11-03 06:07:08:78 [INFO] Server is running on port 3000
+2024-11-03 06:07:08:78 [ERROR] MongoDB connection error: bad auth : authentication failed
+MongoServerError: bad auth : authentication failed
+    at Connection.sendCommand (/Users/sparsh/microservices/moocflix/assessment-service/node_modules/mongodb/lib/cmap/connection.js:289:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Connection.command (/Users/sparsh/microservices/moocflix/assessment-service/node_modules/mongodb/lib/cmap/connection.js:312:26)
+    at async continueScramConversation (/Users/sparsh/microservices/moocflix/assessment-service/node_modules/mongodb/lib/cmap/auth/scram.js:131:15)
+    at async executeScram (/Users/sparsh/microservices/moocflix/assessment-service/node_modules/mongodb/lib/cmap/auth/scram.js:80:5)
+    at async ScramSHA1.auth (/Users/sparsh/microservices/moocflix/assessment-service/node_modules/mongodb/lib/cmap/auth/scram.js:39:16)
+    at async performInitialHandshake (/Users/sparsh/microservices/moocflix/assessment-service/node_modules/mongodb/lib/cmap/connect.js:104:13)
+    at async connect (/Users/sparsh/microservices/moocflix/assessment-service/node_modules/mongodb/lib/cmap/connect.js:24:9)

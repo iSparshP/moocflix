@@ -4,8 +4,12 @@
     "description": "MoocFlix: A mooc streaming platform notification-service is going to be a microservice which is going to carry out these tasks:",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "start": "node src/index.js"
+        "test": "jest --detectOpenHandles",
+        "start": "node src/index.js",
+        "dev": "nodemon src/index.js",
+        "lint": "eslint .",
+        "migrate": "sequelize-cli db:migrate",
+        "seed": "sequelize-cli db:seed:all"
     },
     "author": "Sparsh Prakash",
     "license": "ISC",
@@ -17,6 +21,12 @@
         "kafkajs": "^2.2.4",
         "mailgun-js": "^0.22.0",
         "pg": "^8.13.0",
-        "sequelize": "^6.37.4"
+        "sequelize": "^6.37.4",
+        "retry": "^0.13.1",
+        "express-rate-limit": "^6.3.0",
+        "prom-client": "^14.2.0"
+    },
+    "devDependencies": {
+        "@types/kafkajs": "^1.9.0"
     }
 }

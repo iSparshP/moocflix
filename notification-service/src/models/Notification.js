@@ -1,7 +1,7 @@
 const { Sequelize, DataTypes } = require('sequelize');
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: 'postgres', // Specify the dialect here
-});
+const dbConfig = require('../../config/dbConfig');
+
+const sequelize = new Sequelize(dbConfig.url, dbConfig.options);
 
 const Notification = sequelize.define(
     'Notification',
@@ -21,6 +21,18 @@ const Notification = sequelize.define(
         status: {
             type: DataTypes.STRING,
             allowNull: false,
+        },
+        error: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        retryCount: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0,
+        },
+        lastRetryAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
         },
     },
     {

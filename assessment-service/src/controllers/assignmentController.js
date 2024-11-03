@@ -8,6 +8,7 @@ const {
 const {
     notifyAssignmentSubmissionCompleted,
     notifyAssignmentGradingCompleted,
+    notifyStudents,
 } = require('../services/notificationService');
 const { validateCourseId } = require('../services/courseService');
 
@@ -33,6 +34,16 @@ exports.createAssignment = async (req, res) => {
             assignmentId,
         });
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return res.status(404).json({
+                message: error.message,
+            });
+        }
+        if (error instanceof ValidationError) {
+            return res.status(400).json({
+                message: error.message,
+            });
+        }
         res.status(500).json({
             message: 'Internal server error',
             error: error.message,
@@ -63,6 +74,16 @@ exports.submitAssignment = async (req, res) => {
             submissionId,
         });
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return res.status(404).json({
+                message: error.message,
+            });
+        }
+        if (error instanceof ValidationError) {
+            return res.status(400).json({
+                message: error.message,
+            });
+        }
         res.status(500).json({
             message: 'Internal server error',
             error: error.message,
@@ -78,6 +99,16 @@ exports.getAssignmentResult = async (req, res) => {
         const result = await fetchAssignmentResult(assignmentId);
         res.status(200).json(result);
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return res.status(404).json({
+                message: error.message,
+            });
+        }
+        if (error instanceof ValidationError) {
+            return res.status(400).json({
+                message: error.message,
+            });
+        }
         res.status(500).json({
             message: 'Internal server error',
             error: error.message,
@@ -98,6 +129,16 @@ exports.gradeAssignment = async (req, res) => {
 
         res.status(200).json({ message: 'Assignment graded successfully' });
     } catch (error) {
+        if (error instanceof NotFoundError) {
+            return res.status(404).json({
+                message: error.message,
+            });
+        }
+        if (error instanceof ValidationError) {
+            return res.status(400).json({
+                message: error.message,
+            });
+        }
         res.status(500).json({
             message: 'Internal server error',
             error: error.message,
