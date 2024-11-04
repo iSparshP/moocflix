@@ -89,6 +89,22 @@ setup_kong() {
     docker-compose run --rm kong kong migrations bootstrap
 }
 
+# Validate environment variables
+validate_env() {
+    required_vars=(
+        "USER_SERVICE_URL"
+        "USER_SERVICE_PORT"
+        # ... add all required variables
+    )
+    
+    for var in "${required_vars[@]}"; do
+        if [ -z "${!var}" ]; then
+            log "Error: Missing required environment variable: $var"
+            exit 1
+        fi
+    done
+}
+
 # Main execution
 main() {
     log "Starting MOOCflix API Gateway setup..."
@@ -97,6 +113,7 @@ main() {
     create_directories
     validate_configs
     setup_kong
+    validate_env
     
     log "Setup completed successfully!"
 }

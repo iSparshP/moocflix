@@ -19,6 +19,12 @@ const { errorHandler } = require('./middlewares/errorHandler');
 const { startConsumer } = require('./services/kafkaConsumer');
 const notificationRoutes = require('./routes/notificationRoutes');
 const logger = require('./utils/logger');
+const validateEnv = require('./config/validateEnv');
+const cookieParser = require('cookie-parser');
+const requestId = require('./middlewares/requestId');
+const { setupTelemetry } = require('./utils/telemetry');
+
+validateEnv();
 
 const app = express();
 
@@ -85,6 +91,7 @@ app.use(`${API_VERSION}/users`, userRoutes);
 app.use(`${API_VERSION}/profile`, profileRoutes);
 app.use(`${API_VERSION}/notifications`, notificationRoutes);
 app.use(`${API_VERSION}/system`, require('./routes/healthRoutes'));
+app.use(`${API_VERSION}/health`, require('./routes/healthRoutes'));
 
 // 404 handler for undefined routes
 app.all('*', (req, res, next) => {
@@ -158,6 +165,15 @@ process.on('unhandledRejection', (error) => {
     });
     process.exit(1);
 });
+
+// Initialize telemetry before other setup
+if (process.env.NODE_ENV === 'production') {
+    setupTelemetry();
+}
+
+// Add after existing middleware setup
+app.use(cookieParser());
+app.use(requestId);
 
 // Initialize database and start server
 let server;

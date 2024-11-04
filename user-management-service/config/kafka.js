@@ -3,7 +3,8 @@ const { validateEvent } = require('../middlewares/schemaValidator');
 const logger = require('../src/utils/logger');
 const { retryConnection } = require('../src/utils/connectionRetry');
 const { createBreaker } = require('../utils/circuitBreaker');
-const { validateEventMessage } = require('../config/eventSchemas');
+const { validateEventMessage } = require('../src/config/eventSchemas');
+const { v4: uuidv4 } = require('uuid');
 
 // Centralized Kafka configuration
 const kafka = new Kafka({
@@ -36,20 +37,40 @@ const connectProducer = async () => {
 };
 
 const sendMessage = async (topic, message) => {
-    const breaker = createBreaker(async () => {
-        try {
-            validateEventMessage(topic, message);
-            await producer.send({
-                topic,
-                messages: [{ value: JSON.stringify(message) }],
-            });
-            logger.info(`Message sent to topic ${topic}`);
-        } catch (error) {
-            logger.error(`Failed to send message to topic ${topic}`, { error });
-            await sendToDLQ(topic, message, error);
-            throw error;
+    const breaker = createBreaker(
+        async () => {
+            try {
+                validateEventMessage(topic, message);
+                await producer.send({
+                    topic,
+                    messages: [
+                        {
+                            key: uuidv4(),
+                            value: JSON.stringify(message),
+                            headers: {
+                                timestamp: new Date().toISOString(),
+                                correlationId: uuidv4(),
+                            },
+                        },
+                    ],
+                });
+                logger.info(`Message sent to topic ${topic}`);
+            } catch (error) {
+                logger.error(`Failed to send message to topic ${topic}`, {
+                    error,
+                    topic,
+                    messageId: message.id,
+                });
+                await sendToDLQ(topic, message, error);
+                throw error;
+            }
+        },
+        {
+            timeout: 5000,
+            resetTimeout: 30000,
+            errorThresholdPercentage: 50,
         }
-    });
+    );
     return await breaker.fire();
 };
 
@@ -130,5 +151,5 @@ module.exports = {
     consumeMessages,
     disconnectProducer,
     disconnectConsumer,
-    produceUserRegisteredEvent, // Add this export
+    produceUserRegisteredEvent,
 };

@@ -1,3 +1,4 @@
+const Joi = require('joi');
 const User = require('../models/User.js');
 const { sendMessage } = require('../../config/kafka');
 const { AppError } = require('../utils/errorUtils');
@@ -7,7 +8,7 @@ const { createBreaker } = require('../utils/circuitBreaker');
 
 // Validation schemas
 const updateProfileSchema = Joi.object({
-    name: Joi.string().min(2),
+    name: Joi.string().min(2).max(50),
     email: Joi.string().email(),
     notificationPreferences: Joi.object({
         email: Joi.boolean(),

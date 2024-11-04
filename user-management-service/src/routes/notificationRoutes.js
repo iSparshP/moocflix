@@ -8,8 +8,16 @@ const { protect } = require('../middlewares/authMiddleware');
 const { validateRequest } = require('../middlewares/validateRequest');
 const { AppError } = require('../utils/errorUtils');
 const logger = require('../utils/logger');
+const Joi = require('joi');
 
 const router = express.Router();
+
+const notificationPreferencesSchema = Joi.object({
+    notificationPreferences: Joi.object({
+        email: Joi.boolean().required(),
+        push: Joi.boolean().required(),
+    }).required(),
+});
 
 /**
  * @swagger

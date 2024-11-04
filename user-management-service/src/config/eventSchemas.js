@@ -15,7 +15,7 @@ const baseUserSchema = Joi.object({
     timestamp: Joi.date().iso().required(),
 });
 
-const schemas = {
+const eventSchemas = {
     'User-Creation': baseUserSchema,
     'User-Update': baseUserSchema.keys({
         // Add any User-Update specific fields here
@@ -29,7 +29,7 @@ const schemas = {
  * @throws {Error} If validation fails
  */
 const validateEventMessage = (topic, message) => {
-    const schema = schemas[topic];
+    const schema = eventSchemas[topic];
     if (!schema) {
         throw new Error(`No schema found for topic: ${topic}`);
     }
@@ -49,6 +49,6 @@ const validateEventMessage = (topic, message) => {
 };
 
 module.exports = {
-    schemas,
+    eventSchemas,
     validateEventMessage,
 };
