@@ -1,7 +1,14 @@
 const Notification = require('../models/Notification');
 const smtpConfig = require('../../config/smtpConfig');
 const pushNotificationConfig = require('../../config/pushNotificationConfig');
-const mailgun = require('mailgun-js')(smtpConfig);
+const formData = require('form-data');
+const Mailgun = require('mailgun.js');
+const mailgun = new Mailgun(formData);
+const mg = mailgun.client({
+    username: 'api',
+    key: smtpConfig.apiKey,
+    url: 'https://api.mailgun.net',
+});
 const admin = require('firebase-admin');
 const retry = require('retry');
 
@@ -9,12 +16,25 @@ admin.initializeApp({
     credential: admin.credential.cert(pushNotificationConfig),
 });
 
+// Add App Check verification
+const appCheck = admin.appCheck();
+const verifyAppCheckToken = async (token) => {
+    try {
+        await appCheck.verifyToken(token);
+        return true;
+    } catch (error) {
+        console.error('Invalid App Check token:', error);
+        return false;
+    }
+};
+
 class NotificationError extends Error {
     constructor(message, status = 500, details = {}) {
         super(message);
         this.name = 'NotificationError';
         this.status = status;
         this.details = details;
+        this.timestamp = new Date().toISOString();
     }
 }
 
@@ -95,7 +115,7 @@ exports.sendEmailNotification = async (data) => {
         await retry(
             async () => {
                 try {
-                    await mailgun.messages().send(emailData);
+                    await mg.messages.create(smtpConfig.domain, emailData);
                 } catch (error) {
                     if (error.statusCode === 400) {
                         throw new NotificationError(
@@ -268,5 +288,54 @@ exports.getNotificationHistory = async (userId) => {
             500,
             { originalError: error.message }
         );
+    }
+};
+
+// Add template handling
+const getNotificationTemplate = (type, data) => {
+    const templates = {
+        'Course-Creation': {
+            subject: `New Course: ${data.courseName}`,
+            body: `A new course "${data.courseName}" is now available.`,
+        },
+        'Assessment-Creation': {
+            subject: `New Assessment in ${data.courseName}`,
+            body: `A new assessment has been added to ${data.courseName}.`,
+        },
+        // Add more templates
+    };
+    return templates[type] || null;
+};
+
+// Add batch processing
+const batchSize = 100;
+const batchTimeout = 5000; // 5 seconds
+
+let notificationQueue = [];
+let batchTimer = null;
+
+const processBatch = async () => {
+    if (notificationQueue.length === 0) return;
+
+    const batch = notificationQueue.splice(0, batchSize);
+    try {
+        await Promise.all(
+            batch.map((notification) => {
+                return sendNotification(notification);
+            })
+        );
+    } catch (error) {
+        console.error('Batch processing error:', error);
+    }
+};
+
+// Add email validation and bounce handling
+const validateEmail = async (email) => {
+    try {
+        const response = await mailgun.validate(email);
+        return response.is_valid;
+    } catch (error) {
+        console.error('Email validation error:', error);
+        return false;
     }
 };

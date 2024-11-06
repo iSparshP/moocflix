@@ -1,81 +1,41 @@
 const express = require('express');
-const {
-    updateNotificationPreferences,
-    getNotificationPreferences,
-    testNotification,
-} = require('../controllers/profileController');
+const router = express.Router();
 const { protect } = require('../middlewares/authMiddleware');
 const { validateRequest } = require('../middlewares/validateRequest');
-const { AppError } = require('../utils/errorUtils');
+const notificationService = require('../services/notificationService');
+const { profileUpdateLimiter } = require('../middlewares/rateLimiter');
 const logger = require('../utils/logger');
 const Joi = require('joi');
 
-const router = express.Router();
-
 const notificationPreferencesSchema = Joi.object({
-    notificationPreferences: Joi.object({
-        email: Joi.boolean().required(),
-        push: Joi.boolean().required(),
-    }).required(),
+    email: Joi.boolean().required(),
+    push: Joi.boolean().required(),
 });
 
-/**
- * @swagger
- * /notifications/preferences:
- *   get:
- *     tags: [Notifications]
- *     security:
- *       - bearerAuth: []
- *     summary: Get user notification preferences
- *     responses:
- *       200:
- *         description: Current notification preferences
- */
-router.get('/preferences', protect, getNotificationPreferences);
-
-/**
- * @swagger
- * /notifications/preferences:
- *   put:
- *     tags: [Notifications]
- *     security:
- *       - bearerAuth: []
- *     summary: Update notification preferences
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email: { type: boolean }
- *               push: { type: boolean }
- */
 router.put(
     '/preferences',
     protect,
+    profileUpdateLimiter,
     validateRequest(notificationPreferencesSchema),
-    updateNotificationPreferences
+    async (req, res, next) => {
+        try {
+            const user = await User.findById(req.user.id);
+            await user.updateNotificationPreferences(req.body);
+
+            logger.info('Notification preferences updated', {
+                userId: req.user.id,
+                preferences: req.body,
+            });
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Notification preferences updated',
+                data: user.notificationPreferences,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 );
-
-/**
- * @swagger
- * /notifications/test:
- *   post:
- *     tags: [Notifications]
- *     security:
- *       - bearerAuth: []
- *     summary: Send test notification
- */
-router.post('/test', protect, testNotification);
-
-// Error handling middleware
-router.use((err, req, res, next) => {
-    logger.error('Notification route error:', {
-        path: req.path,
-        error: err.message,
-    });
-    next(err);
-});
 
 module.exports = router;

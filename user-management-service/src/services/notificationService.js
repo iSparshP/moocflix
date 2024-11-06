@@ -8,11 +8,13 @@ const serviceRegistry = require('../utils/serviceDiscovery');
 class NotificationService {
     constructor() {
         this.serviceName = 'notification';
+        this.isExternalMode = false;
         this.initialize();
     }
 
     async initialize() {
         try {
+            // Try to initialize with external service
             this.baseURL = await serviceRegistry.getServiceUrl(
                 this.serviceName
             );
@@ -23,44 +25,70 @@ class NotificationService {
                     'Content-Type': 'application/json',
                 },
             });
-            logger.info('NotificationService initialized', {
+            this.isExternalMode = true;
+            logger.info('NotificationService initialized in external mode', {
                 baseURL: this.baseURL,
             });
         } catch (error) {
-            logger.error('Failed to initialize NotificationService', {
+            // Fallback to local mode
+            logger.warn('NotificationService falling back to local mode', {
                 error: error.message,
             });
-            throw new AppError(
-                `Service initialization failed: ${error.message}`,
-                500
-            );
+            this.isExternalMode = false;
         }
     }
 
-    /**
-     * Send welcome email to new users
-     * @param {string} email - User's email address
-     * @returns {Promise<Object>} Response from notification service
-     */
-    async sendWelcomeEmail(email) {
+    async sendNotification(type, recipient, data) {
+        if (this.isExternalMode) {
+            return this._sendExternalNotification(type, recipient, data);
+        } else {
+            return this._sendLocalNotification(type, recipient, data);
+        }
+    }
+
+    async _sendLocalNotification(type, recipient, data) {
+        try {
+            // Log the notification details
+            logger.info('Sending notification (local mode)', {
+                type,
+                recipient,
+                data,
+            });
+            return { success: true, mode: 'local' };
+        } catch (error) {
+            logger.error('Failed to send local notification', {
+                type,
+                recipient,
+                error: error.message,
+            });
+            throw new AppError('Failed to send notification', 500);
+        }
+    }
+
+    async _sendExternalNotification(type, recipient, data) {
         const breaker = createBreaker(async () => {
             try {
                 const response = await retryOperation(() =>
-                    this.axios.post('/notifications/welcome', {
-                        email,
-                        template: 'welcome',
+                    this.axios.post('/notifications/send', {
+                        type,
+                        recipient,
+                        data,
                         timestamp: new Date().toISOString(),
                     })
                 );
-                logger.info('Welcome email sent successfully', { email });
+                logger.info('External notification sent successfully', {
+                    type,
+                    recipient,
+                });
                 return response.data;
             } catch (error) {
-                logger.error('Failed to send welcome email', {
-                    email,
+                logger.error('Failed to send external notification', {
+                    type,
+                    recipient,
                     error: error.message,
                 });
                 throw new AppError(
-                    `Failed to send welcome email: ${error.message}`,
+                    `Failed to send notification: ${error.message}`,
                     500
                 );
             }
@@ -69,36 +97,35 @@ class NotificationService {
         return await breaker.fire();
     }
 
-    /**
-     * Send profile update notification
-     * @param {string} email - User's email address
-     * @returns {Promise<Object>} Response from notification service
-     */
-    async sendProfileUpdateAlert(email) {
-        const breaker = createBreaker(async () => {
-            try {
-                const response = await retryOperation(() =>
-                    this.axios.post('/notifications/profile-update', {
-                        email,
-                        template: 'profile-update',
-                        timestamp: new Date().toISOString(),
-                    })
-                );
-                logger.info('Profile update notification sent', { email });
-                return response.data;
-            } catch (error) {
-                logger.error('Failed to send profile update notification', {
-                    email,
-                    error: error.message,
-                });
-                throw new AppError(
-                    `Failed to send profile update notification: ${error.message}`,
-                    500
-                );
-            }
+    // Wrapper methods for specific notification types
+    async sendWelcomeEmail(email) {
+        return this.sendNotification('welcome', email, {
+            template: 'welcome',
+            timestamp: new Date().toISOString(),
         });
+    }
 
-        return await breaker.fire();
+    async sendPasswordResetEmail(email, resetUrl) {
+        return this.sendNotification('password-reset', email, {
+            template: 'password-reset',
+            resetUrl,
+            timestamp: new Date().toISOString(),
+        });
+    }
+
+    async sendVerificationEmail(email, verificationUrl) {
+        return this.sendNotification('email-verification', email, {
+            template: 'email-verification',
+            verificationUrl,
+            timestamp: new Date().toISOString(),
+        });
+    }
+
+    async sendPasswordChangeConfirmation(email) {
+        return this.sendNotification('password-change', email, {
+            template: 'password-change',
+            timestamp: new Date().toISOString(),
+        });
     }
 }
 

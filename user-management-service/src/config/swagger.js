@@ -57,6 +57,55 @@ const swaggerOptions = {
             { name: 'Profile', description: 'User profile management' },
             { name: 'System', description: 'System health and monitoring' },
         ],
+        paths: {
+            '/auth/login': {
+                post: {
+                    tags: ['Auth'],
+                    summary: 'User login',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['email', 'password'],
+                                    properties: {
+                                        email: {
+                                            type: 'string',
+                                            format: 'email',
+                                        },
+                                        password: {
+                                            type: 'string',
+                                            format: 'password',
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    responses: {
+                        200: {
+                            description: 'Login successful',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            token: {
+                                                type: 'string',
+                                            },
+                                            user: {
+                                                $ref: '#/components/schemas/User',
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
     },
     apis: ['./src/routes/*.js', './src/models/*.js'],
 };

@@ -6,6 +6,9 @@ const { limits } = require('../config/resources');
 const { paths } = require('../config/env');
 const metricsPersistence = require('./metricsPersistence');
 const registry = require('./serviceRegistry');
+const kafkaClient = require('./kafka/kafkaClient');
+const config = require('../config/environment');
+const logger = require('../utils/logger');
 
 class MetricsService extends EventEmitter {
     constructor() {
@@ -298,6 +301,38 @@ class MetricsService extends EventEmitter {
             lastRun: await cleanup.getLastRunMetrics(),
             storage: await cleanup.getStorageMetrics(),
         };
+    }
+
+    async recordTranscodingMetrics(videoId, metrics) {
+        try {
+            await kafkaClient.sendMessage(config.kafka.topics.metrics, {
+                videoId,
+                metrics,
+                timestamp: Date.now(),
+            });
+
+            logger.info(`Recorded metrics for video ${videoId}`);
+        } catch (error) {
+            logger.error('Failed to record metrics:', error);
+            throw error;
+        }
+    }
+
+    async processMetrics() {
+        await kafkaClient.subscribe(
+            [config.kafka.topics.metrics],
+            async (message, metadata) => {
+                try {
+                    logger.info(
+                        `Processing metrics for video ${message.videoId}`
+                    );
+                    // Process and store metrics
+                    await this.storeMetrics(message.metrics);
+                } catch (error) {
+                    logger.error(`Error processing metrics: ${error.message}`);
+                }
+            }
+        );
     }
 }
 

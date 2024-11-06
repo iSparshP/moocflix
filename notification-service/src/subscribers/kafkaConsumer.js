@@ -2,6 +2,7 @@ const { Kafka, logLevel } = require('kafkajs');
 const notificationService = require('../services/notificationService');
 const kafkaConfig = require('../../config/kafkaConfig');
 const Notification = require('../models/Notification');
+const retry = require('retry');
 
 const kafka = new Kafka({
     ...kafkaConfig,
@@ -10,6 +11,8 @@ const kafka = new Kafka({
 
 const consumer = kafka.consumer({
     groupId: 'notification-service',
+    sessionTimeout: 30000,
+    heartbeatInterval: 3000,
     maxWaitTimeInMs: 50,
     retry: {
         maxRetryTime: 30000,
@@ -93,67 +96,95 @@ const handleKafkaMessage = async (topic, event) => {
 let isShuttingDown = false;
 
 const gracefulShutdown = async () => {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-
     try {
-        console.log('Disconnecting from Kafka...');
+        isShuttingDown = true;
+        console.log('Shutting down Kafka consumer...');
         await consumer.disconnect();
-        console.log('Successfully disconnected from Kafka');
+        console.log('Kafka consumer disconnected successfully');
     } catch (error) {
-        console.error('Error during Kafka disconnect:', error);
-        process.exit(1);
+        console.error('Error during Kafka consumer shutdown:', error);
     }
 };
 
 exports.start = async () => {
     try {
-        // Connect to Kafka
-        await consumer.connect();
-        console.log('Connected to Kafka');
-
-        // Subscribe to all topics
-        for (const topic of TOPICS) {
-            await consumer.subscribe({
-                topic,
-                fromBeginning: false, // Change to true if you want to process all historical messages
-            });
-            console.log(`Subscribed to topic: ${topic}`);
-        }
-
-        await consumer.run({
-            autoCommit: true,
-            autoCommitInterval: 5000,
-            autoCommitThreshold: 100,
-            eachMessage: async ({ topic, partition, message }) => {
-                if (isShuttingDown) return;
-
-                try {
-                    console.log(`Processing message from topic: ${topic}`, {
-                        partition,
-                        offset: message.offset,
-                        timestamp: message.timestamp,
-                    });
-
-                    const event = JSON.parse(message.value.toString());
-                    await handleKafkaMessage(topic, event);
-                } catch (error) {
-                    console.error('Kafka message processing error:', {
-                        topic,
-                        partition,
-                        offset: message.offset,
-                        error: error.message,
-                        timestamp: new Date().toISOString(),
-                    });
-                }
-            },
+        const operation = retry.operation({
+            retries: 5,
+            factor: 2,
+            minTimeout: 1000,
+            maxTimeout: 60000,
         });
 
-        // Setup graceful shutdown
-        process.on('SIGTERM', gracefulShutdown);
-        process.on('SIGINT', gracefulShutdown);
+        operation.attempt(async (currentAttempt) => {
+            try {
+                await consumer.connect();
+                console.log('Connected to DigitalOcean Kafka with SSL');
+
+                // Subscribe to all topics
+                for (const topic of TOPICS) {
+                    await consumer.subscribe({
+                        topic,
+                        fromBeginning: false, // Change to true if you want to process all historical messages
+                    });
+                    console.log(`Subscribed to topic: ${topic}`);
+                }
+
+                await consumer.run({
+                    autoCommit: true,
+                    autoCommitInterval: 5000,
+                    autoCommitThreshold: 100,
+                    eachMessage: async ({ topic, partition, message }) => {
+                        if (isShuttingDown) return;
+
+                        try {
+                            console.log(
+                                `Processing message from topic: ${topic}`,
+                                {
+                                    partition,
+                                    offset: message.offset,
+                                    timestamp: message.timestamp,
+                                }
+                            );
+
+                            const event = JSON.parse(message.value.toString());
+                            await handleKafkaMessage(topic, event);
+                        } catch (error) {
+                            console.error('Kafka message processing error:', {
+                                topic,
+                                partition,
+                                offset: message.offset,
+                                error: error.message,
+                                timestamp: new Date().toISOString(),
+                            });
+                        }
+                    },
+                });
+
+                // Setup graceful shutdown
+                process.on('SIGTERM', gracefulShutdown);
+                process.on('SIGINT', gracefulShutdown);
+            } catch (error) {
+                console.error(
+                    `Failed to connect to Kafka (attempt ${currentAttempt}):`,
+                    {
+                        error: error.message,
+                        stack: error.stack,
+                        timestamp: new Date().toISOString(),
+                    }
+                );
+
+                if (error.message.includes('SSL')) {
+                    console.error('SSL Connection Error:', error.message);
+                }
+
+                if (operation.retry(error)) {
+                    return;
+                }
+                throw error;
+            }
+        });
     } catch (error) {
-        console.error('Failed to start Kafka consumer:', error);
+        console.error('Fatal error starting Kafka consumer:', error);
         process.exit(1);
     }
 };

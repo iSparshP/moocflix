@@ -23,6 +23,7 @@ const validateEnv = require('./config/validateEnv');
 const cookieParser = require('cookie-parser');
 const requestId = require('./middlewares/requestId');
 const { setupTelemetry } = require('./utils/telemetry');
+const timeout = require('./middlewares/timeout');
 
 validateEnv();
 
@@ -127,8 +128,10 @@ const gracefulShutdown = async () => {
     }, shutdownTimeout);
 
     try {
+        // Stop accepting new requests
         server.close(() => logger.info('HTTP server closed'));
 
+        // Close all connections
         await Promise.all([
             disconnectProducer(),
             disconnectConsumer(),
@@ -174,6 +177,7 @@ if (process.env.NODE_ENV === 'production') {
 // Add after existing middleware setup
 app.use(cookieParser());
 app.use(requestId);
+app.use(timeout(30)); // 30 seconds timeout
 
 // Initialize database and start server
 let server;

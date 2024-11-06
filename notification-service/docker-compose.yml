@@ -1,44 +1,44 @@
-version: '3.8'
-
 services:
   notification-service:
     build: .
+    container_name: notification-service
     ports:
-      - "3000:3000"
+      - "3003:3003"
     env_file: .env
-    depends_on:
-      - postgres
-      - kafka
-    networks:
-      - moocflix-network
-
-  postgres:
-    image: postgres:14-alpine
     environment:
-      POSTGRES_DB: notification_db
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "5432:5432"
+      - NODE_ENV=production
+      - DB_USER=${DB_USER}
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PORT=${DB_PORT}
+      # Add Kafka environment variables
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_CLIENT_ID=${KAFKA_CLIENT_ID}
+      - KAFKA_GROUP_ID=${KAFKA_GROUP_ID}
+      - KAFKA_SSL=${KAFKA_SSL}
+      - KAFKA_SASL=${KAFKA_SASL}
+      - KAFKA_SASL_MECHANISM=${KAFKA_SASL_MECHANISM}
+      - KAFKA_USERNAME=${KAFKA_USERNAME}
+      - KAFKA_PASSWORD=${KAFKA_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - moocflix-network
-
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    networks:
-      - moocflix-network
-
-volumes:
-  postgres_data:
+      - ./postgrescert:/app/postgrescert:ro
+      # Add volume for Kafka certificates
+      - ./certs:/app/certs:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
-  moocflix-network:
-    driver: bridge 
+  default:
+    name: notification-network
+    driver: bridge

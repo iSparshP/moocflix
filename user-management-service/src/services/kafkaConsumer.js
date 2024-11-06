@@ -3,6 +3,7 @@ const { handleUserCreation, handleUserUpdate } = require('./messageHandlers');
 const logger = require('../utils/logger');
 const { validateEventMessage } = require('../config/eventSchemas');
 const { AppError } = require('../utils/errorUtils');
+const handleKafkaError = require('../utils/kafkaErrorHandler');
 
 const messageHandlers = {
     'User-Creation': handleUserCreation,
@@ -55,5 +56,16 @@ const startConsumer = async () => {
         throw error;
     }
 };
+
+// Add error handling to consumer
+consumer.on('consumer.crash', async (error) => {
+    handleKafkaError(error);
+    await consumer.disconnect();
+    process.exit(1);
+});
+
+consumer.on('consumer.connect', () => {
+    logger.info('Kafka consumer connected successfully');
+});
 
 module.exports = { startConsumer };

@@ -67,4 +67,9 @@ const validateNotification = (req, res, next) => {
     next();
 };
 
-module.exports = validateNotification;
+const validatePayload = (payload) => {
+    const maxSize = 4096; // FCM payload limit
+    return JSON.stringify(payload).length <= maxSize;
+};
+
+module.exports = { validateNotification, validatePayload };

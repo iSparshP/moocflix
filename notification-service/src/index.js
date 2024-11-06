@@ -5,59 +5,98 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const kafkaConsumer = require('./subscribers/kafkaConsumer');
 const rateLimit = require('express-rate-limit');
 const errorHandler = require('./middlewares/errorHandler');
-const { sequelize } = require('./models/Notification');
-const { requestCounter } = require('./middlewares/metrics');
+const { sequelize, testConnection } = require('../config/dbConfig');
 const requestLogger = require('./middlewares/requestLogger');
-const { registerService } = require('./utils/serviceRegistry');
 
 const app = express();
 const port = process.env.PORT || 3003;
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000, // Consider adjusting based on expected load
+    max: 100, // Consider adjusting based on expected load
+    message: 'Too many requests, please try again later',
+    standardHeaders: true,
+    legacyHeaders: false,
 });
+
 app.use(limiter);
 app.use(bodyParser.json());
 app.use(requestLogger);
-app.use((req, res, next) => {
-    res.on('finish', () => {
-        requestCounter.inc({
-            type: req.path,
-            status: res.statusCode,
-        });
-    });
-    next();
-});
+
 app.use('/api/v1/notifications', notificationRoutes);
 
-// Add error handling middleware last
+// Add health check endpoint
+app.get('/health', async (req, res) => {
+    try {
+        // Check database connection
+        await sequelize.authenticate();
+
+        // Check Kafka connection
+        const kafkaStatus = await kafkaConsumer.isConnected();
+
+        res.status(200).json({
+            status: 'healthy',
+            checks: {
+                database: 'connected',
+                kafka: kafkaStatus ? 'connected' : 'disconnected',
+            },
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        res.status(503).json({
+            status: 'unhealthy',
+            error: error.message,
+            timestamp: new Date().toISOString(),
+        });
+    }
+});
+
+// Error handling middleware
 app.use(errorHandler);
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    // Application specific logging, throwing an error, or other logic here
 });
 
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
-    // Application specific logging, throwing an error, or other logic here
     process.exit(1);
 });
 
 const startServer = async () => {
     try {
-        await sequelize.authenticate();
-        console.log('Database connection established successfully.');
+        // Test database connection with retries
+        let connected = false;
+        let retries = 5;
 
-        await registerService();
-        console.log('Service registered with Consul');
+        while (!connected && retries > 0) {
+            connected = await testConnection();
+            if (!connected) {
+                console.log(
+                    `Database connection attempt failed. Retries left: ${retries}`
+                );
+                retries--;
+                if (retries > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds before retry
+                }
+            }
+        }
+
+        if (!connected) {
+            throw new Error(
+                'Unable to establish database connection after multiple retries'
+            );
+        }
 
         app.listen(port, () => {
             console.log(`Notification service running on port ${port}`);
             kafkaConsumer.start();
         });
     } catch (error) {
-        console.error('Error starting server:', error);
+        console.error('Error starting server:', {
+            error: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString(),
+        });
         process.exit(1);
     }
 };

@@ -1,40 +1,64 @@
-const { AppError } = require('../utils/errorUtils');
-const logger = require('../utils/logger');
-const schemas = require('../config/eventSchemas');
+const Joi = require('joi');
 
-const validateEvent = (topic) => {
+/**
+ * Validates Kafka message schemas before processing
+ * @param {Object} schema - Joi schema for validation
+ * @returns {Function} Middleware function
+ */
+const validateSchema = (schema) => {
     return (message) => {
-        try {
-            // Check schema existence
-            const schema = schemas[topic];
-            if (!schema) {
-                throw new AppError(`No schema found for topic: ${topic}`, 400);
-            }
+        const { error, value } = schema.validate(message, {
+            abortEarly: false,
+            stripUnknown: true,
+        });
 
-            // Validate message
-            const { error, value } = schema.validate(message, {
-                abortEarly: false,
-                stripUnknown: true,
-                presence: 'required',
-            });
-
-            if (error) {
-                const details = error.details.map((d) => d.message).join(', ');
-                logger.error('Event validation failed', {
-                    topic,
-                    errors: details,
-                    message,
-                });
-                throw new AppError(`Invalid message format: ${details}`, 400);
-            }
-
-            logger.debug('Event validation successful', { topic });
-            return value; // Return normalized message
-        } catch (err) {
-            if (err instanceof AppError) throw err;
-            throw new AppError(err.message, 500);
+        if (error) {
+            const errorMessage = error.details
+                .map((detail) => detail.message)
+                .join(', ');
+            throw new Error(`Schema validation failed: ${errorMessage}`);
         }
+
+        return value;
     };
 };
 
-module.exports = { validateEvent };
+// Common schemas used across Kafka messages
+const schemas = {
+    userCreated: Joi.object({
+        userId: Joi.string().required(),
+        email: Joi.string().email().required(),
+        timestamp: Joi.date().iso().required(),
+        metadata: Joi.object().optional(),
+    }),
+
+    userUpdated: Joi.object({
+        userId: Joi.string().required(),
+        changes: Joi.object().required(),
+        timestamp: Joi.date().iso().required(),
+    }),
+
+    authEvent: Joi.object({
+        userId: Joi.string().required(),
+        eventType: Joi.string()
+            .valid('login', 'logout', 'password-reset')
+            .required(),
+        timestamp: Joi.date().iso().required(),
+        metadata: Joi.object().optional(),
+    }),
+
+    notification: Joi.object({
+        type: Joi.string().valid('email', 'push', 'sms').required(),
+        recipient: Joi.string().required(),
+        content: Joi.object({
+            subject: Joi.string().required(),
+            body: Joi.string().required(),
+        }).required(),
+        metadata: Joi.object().optional(),
+    }),
+};
+
+module.exports = {
+    validateSchema,
+    schemas,
+};

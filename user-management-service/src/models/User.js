@@ -66,6 +66,12 @@ const userSchema = new mongoose.Schema(
             type: Date,
             select: false,
         },
+        isEmailVerified: {
+            type: Boolean,
+            default: false,
+        },
+        emailVerificationToken: String,
+        emailVerificationExpires: Date,
     },
     {
         timestamps: true,
@@ -73,6 +79,11 @@ const userSchema = new mongoose.Schema(
         toObject: { virtuals: true },
     }
 );
+
+// Add after schema definition
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ emailVerificationToken: 1 }, { sparse: true });
+userSchema.index({ passwordResetToken: 1 }, { sparse: true });
 
 // Password hashing middleware
 userSchema.pre('save', async function (next) {

@@ -1,51 +1,74 @@
 const CircuitBreaker = require('opossum');
-const logger = require('../utils/logger');
+const logger = require('./logger');
 
 /**
- * Default circuit breaker configuration
- * @type {Object}
- */
-const defaultOptions = {
-    timeout: 3000, // Time in ms before a request is considered failed
-    errorThresholdPercentage: 50, // Percentage of failures before opening circuit
-    resetTimeout: 30000, // Time in ms to wait before attempting to close circuit
-    volumeThreshold: 10, // Minimum number of requests before tripping circuit
-    rollingCountTimeout: 10000, // Time window in ms for error rate calculation
-};
-
-/**
- * Creates a circuit breaker instance with event logging
- * @param {Function} fn - Function to wrap with circuit breaker
- * @param {Object} options - Circuit breaker options
+ * Creates a circuit breaker instance with default or custom options
+ * @param {Function} asyncFunction - The async function to protect
+ * @param {Object} options - Circuit breaker configuration options
  * @returns {CircuitBreaker} Configured circuit breaker instance
  */
-const createBreaker = (fn, options = {}) => {
-    const breaker = new CircuitBreaker(fn, { ...defaultOptions, ...options });
+const createBreaker = (asyncFunction, options = {}) => {
+    const defaultOptions = {
+        timeout: 3000, // Time in milliseconds to wait for function execution
+        errorThresholdPercentage: 50, // Error percentage to trip circuit
+        resetTimeout: 30000, // Time to wait before attempting reset
+        volumeThreshold: 10, // Minimum executions before error percentage calculation
+        errorFilter: (error) => {
+            // Don't count 4xx errors as failures
+            return error.statusCode >= 500;
+        },
+    };
 
-    // Add event logging
+    const breaker = new CircuitBreaker(asyncFunction, {
+        ...defaultOptions,
+        ...options,
+    });
+
+    // Event handlers
     breaker.on('open', () => {
-        logger.warn('Circuit breaker opened', { name: fn.name });
+        logger.warn('Circuit Breaker opened', {
+            name: asyncFunction.name || 'anonymous',
+            failures: breaker.stats.failures,
+            successes: breaker.stats.successes,
+        });
     });
 
     breaker.on('halfOpen', () => {
-        logger.info('Circuit breaker half-opened', { name: fn.name });
+        logger.info('Circuit Breaker half-open', {
+            name: asyncFunction.name || 'anonymous',
+        });
     });
 
     breaker.on('close', () => {
-        logger.info('Circuit breaker closed', { name: fn.name });
+        logger.info('Circuit Breaker closed', {
+            name: asyncFunction.name || 'anonymous',
+        });
     });
 
     breaker.on('reject', () => {
-        logger.error('Circuit breaker rejected request', { name: fn.name });
+        logger.warn('Circuit Breaker rejected request', {
+            name: asyncFunction.name || 'anonymous',
+            state: breaker.state,
+        });
+    });
+
+    breaker.on('timeout', () => {
+        logger.error('Circuit Breaker timeout', {
+            name: asyncFunction.name || 'anonymous',
+            timeout: breaker.options.timeout,
+        });
     });
 
     breaker.fallback(() => {
-        const error = new Error('Service unavailable');
-        error.statusCode = 503;
-        throw error;
+        logger.error('Circuit Breaker fallback triggered', {
+            name: asyncFunction.name || 'anonymous',
+        });
+        throw new Error('Service temporarily unavailable');
     });
 
     return breaker;
 };
 
-module.exports = { createBreaker };
+module.exports = {
+    createBreaker,
+};

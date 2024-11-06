@@ -1,55 +1,16 @@
 version: '3.8'
 
 services:
-  user-management:
+  app:
     build: .
-    container_name: user-management
     ports:
       - "3007:3007"
-    environment:
-      - NODE_ENV=production
-      - PORT=3007
-      - MONGO_URI=mongodb://mongodb:27017/users
-      - KAFKA_BROKER=kafka:9092
-      - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGIN=https://moocflix.tech
-    networks:
-      - moocflix-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/api/v1/system/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 30s
-    depends_on:
-      - mongodb
-      - kafka
-
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
-    ports:
-      - "27017:27017"
+    env_file:
+      - .env
     volumes:
-      - mongodb_data:/data/db
-    networks:
-      - moocflix-network
-
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    container_name: kafka
-    ports:
-      - "9092:9092"
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
     environment:
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    networks:
-      - moocflix-network
-
-volumes:
-  mongodb_data:
-
-networks:
-  moocflix-network:
-    external: true 
+      - NODE_ENV=development
+      - PORT=3007
+    command: npm start

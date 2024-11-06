@@ -4,49 +4,32 @@ services:
   transcoding-service:
     build: .
     ports:
-      - "3004:3004"
+      - "3006:3006"
       - "3001:3001"
     volumes:
       - ./videos/input:/app/temp/videos
       - ./videos/output:/app/temp/processed
     environment:
       - NODE_ENV=production
-      - SERVICE_PORT=3004
-      - KAFKA_HOST=kafka:9092
-      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_CLIENT_ID=${KAFKA_CLIENT_ID}
+      - KAFKA_USERNAME=${KAFKA_USERNAME}
+      - KAFKA_PASSWORD=${KAFKA_PASSWORD}
+      - KAFKA_TRANSCODE_TOPIC=${KAFKA_TRANSCODE_TOPIC}
+      - KAFKA_STATUS_TOPIC=${KAFKA_STATUS_TOPIC}
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DATABASE=${REDIS_DATABASE}
       - INPUT_VIDEO_PATH=/app/temp/videos
       - OUTPUT_VIDEO_PATH=/app/temp/processed
     networks:
       - moocflix-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3004/api/v1/health/liveness"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3006/api/v1/health/liveness"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 5s
-    depends_on:
-      - kafka
-      - redis
-
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    networks:
-      - moocflix-network
-
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - moocflix-network
 
 volumes:
   redis-data:

@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules
+npm-debug.log
+
+# Environment variables
+.env
+.env.*
+
+# Development files
+.vscode
+.idea
+*.md
+test
+tests
+coverage
+.nyc_output
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Build files
+dist
+build
+
+# Temporary files
+tmp
+temp 

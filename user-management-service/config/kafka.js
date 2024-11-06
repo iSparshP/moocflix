@@ -1,15 +1,27 @@
 const { Kafka } = require('kafkajs');
-const { validateEvent } = require('../middlewares/schemaValidator');
+const config = require('./appConfig');
 const logger = require('../src/utils/logger');
+const {
+    validateSchema,
+    schemas,
+} = require('../src/middlewares/schemaValidator');
 const { retryConnection } = require('../src/utils/connectionRetry');
-const { createBreaker } = require('../utils/circuitBreaker');
+const { createBreaker } = require('../src/utils/circuitBreaker');
 const { validateEventMessage } = require('../src/config/eventSchemas');
 const { v4: uuidv4 } = require('uuid');
 
 // Centralized Kafka configuration
 const kafka = new Kafka({
-    clientId: 'user-management-service',
-    brokers: [process.env.KAFKA_BROKER || 'kafka:9092'],
+    clientId: config.kafka.clientId,
+    brokers: config.kafka.brokers,
+    ssl: true,
+    sasl: {
+        mechanism: 'plain',
+        username: process.env.KAFKA_USERNAME,
+        password: process.env.KAFKA_PASSWORD,
+    },
+    connectionTimeout: config.kafka.connectionTimeout,
+    authenticationTimeout: config.kafka.authenticationTimeout,
     retry: {
         initialRetryTime: 100,
         retries: 5,
@@ -17,9 +29,16 @@ const kafka = new Kafka({
 });
 
 // Shared instances
-const producer = kafka.producer();
+const producer = kafka.producer({
+    allowAutoTopicCreation: false,
+    transactionTimeout: 30000,
+});
+
 const consumer = kafka.consumer({
-    groupId: 'user-management-group',
+    groupId: config.kafka.groupId,
+    sessionTimeout: 30000,
+    heartbeatInterval: 3000,
+    maxBytesPerPartition: 1048576, // 1MB
     retry: {
         initialRetryTime: 100,
         retries: 3,
@@ -139,6 +158,21 @@ const disconnectConsumer = async () => {
     logger.info('Kafka Consumer disconnected');
 };
 
+// Health check
+const checkKafkaHealth = async () => {
+    try {
+        const admin = kafka.admin();
+        await admin.connect();
+        const topics = await admin.listTopics();
+        await admin.disconnect();
+        logger.info('Kafka connection healthy', { topics: topics.length });
+        return 'healthy';
+    } catch (error) {
+        logger.error('Kafka health check failed', { error: error.message });
+        return 'unhealthy';
+    }
+};
+
 module.exports = {
     kafka,
     producer,
@@ -152,4 +186,5 @@ module.exports = {
     disconnectProducer,
     disconnectConsumer,
     produceUserRegisteredEvent,
+    checkKafkaHealth,
 };

@@ -4,9 +4,19 @@ const config = {
         env: process.env.NODE_ENV || 'development',
     },
     kafka: {
-        brokers: [process.env.KAFKA_BROKER || 'kafka:9092'],
+        brokers: process.env.KAFKA_BROKERS
+            ? process.env.KAFKA_BROKERS.split(',')
+            : [],
         clientId: 'user-management-service',
         groupId: 'user-management-group',
+        ssl: true,
+        sasl: {
+            mechanism: 'plain',
+            username: process.env.KAFKA_USERNAME,
+            password: process.env.KAFKA_PASSWORD,
+        },
+        connectionTimeout: 5000,
+        authenticationTimeout: 10000,
     },
     mongo: {
         uri: process.env.MONGO_URI,
