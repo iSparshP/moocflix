@@ -2,27 +2,16 @@
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
-const { limits } = require('./config/resources');
 const { paths } = require('./config/env');
-const consumer = require('./config/kafka');
+const kafka = require('./config/kafka');
 const { transcodeVideo } = require('./services/transcodeService');
-const kafka = require('./utils/kafka');
-const queue = require('./services/queueService');
-const cleanup = require('./services/cleanupService');
-const validator = require('./services/validationService');
-const metricsService = require('./services/metricsService');
-const healthRoutes = require('./routes/health');
 const logger = require('./utils/logger');
-const requestLogger = require('./middleware/requestLogger');
-const { errorHandler } = require('./middleware/errorHandler');
-const compression = require('compression');
-const timeout = require('connect-timeout');
-const { securityMiddleware } = require('./middleware/security');
-const registry = require('./utils/serviceRegistry');
+const cleanup = require('./services/cleanupService');
+const healthRoutes = require('./routes/health');
+const s3Service = require('./services/s3Service');
 
 const app = express();
 const port = process.env.SERVICE_PORT || 3004;
-const healthCheckPort = process.env.HEALTH_CHECK_PORT || 3001;
 
 // Initialize queue processors
 let queueProcessors = [];
@@ -32,16 +21,8 @@ const init = async () => {
         await Promise.all([
             fs.mkdir(paths.input, { recursive: true }),
             fs.mkdir(paths.output, { recursive: true }),
-            metricsService.init(),
-            queue.recover(),
+            kafka.initKafka(),
         ]);
-
-        // Start queue processors
-        for (let i = 0; i < limits.maxConcurrentJobs; i++) {
-            const processor = setInterval(() => processQueue(), 100);
-            queueProcessors.push(processor);
-        }
-
         return true;
     } catch (error) {
         logger.error('Initialization failed:', { error });
@@ -49,158 +30,139 @@ const init = async () => {
     }
 };
 
-async function processQueue() {
-    const job = queue.getNextJob();
-    if (!job) return;
+async function processVideo(data) {
+    const { videoId, profile } = data;
+    const messageId = `${videoId}-${Date.now()}`;
 
     try {
-        await queue.startJob(job);
-        const { videoId, profile } = job;
-
-        logger.logJobStart(videoId, profile);
-        metricsService.trackTranscodingJob(videoId, profile);
-        await transcodeVideo(videoId, profile);
-
-        const outputPath = path.join(paths.output, `${videoId}-transcoded.mp4`);
-        const stats = await fs.stat(outputPath);
-
-        metricsService.completeTranscodingJob(videoId, stats.size);
-        await cleanup.cleanupTranscodedFile(videoId);
-        logger.logJobComplete(videoId, Date.now() - job.startTime);
-
-        await kafka.sendMessage('Transcoding-Completed', {
+        logger.info(`Starting video transcoding`, {
+            messageId,
             videoId,
-            transcodedUrl: outputPath,
-            attempts: job.attempts + 1,
-            metrics: metricsService.getMetricsSummary(),
+            profile,
+        });
+
+        // Download from S3
+        await s3Service.downloadVideo(videoId);
+
+        // Add progress updates during transcoding
+        await kafka.sendMessage(config.kafka.topics.progress, {
+            messageId,
+            videoId,
+            status: 'processing',
+            progress: {
+                stage: 'transcoding',
+                percent: 0,
+                timestamp: Date.now(),
+            },
+        });
+
+        // Transcode video
+        await transcodeVideo(videoId, profile, async (progress) => {
+            // Send progress updates
+            await kafka.sendMessage(config.kafka.topics.progress, {
+                messageId,
+                videoId,
+                status: 'processing',
+                progress: {
+                    stage: 'transcoding',
+                    percent: progress,
+                    timestamp: Date.now(),
+                },
+            });
+        });
+
+        // Upload to S3
+        const s3Path = await s3Service.uploadVideo(videoId, profile);
+
+        // Cleanup local files
+        await cleanup.cleanupTranscodedFile(videoId);
+
+        // Send success message with more metadata
+        await kafka.sendMessage(config.kafka.topics.completed, {
+            messageId,
+            videoId,
+            status: 'success',
+            profile,
+            s3Path,
+            metadata: {
+                completedAt: Date.now(),
+                processingTime:
+                    Date.now() - parseInt(data.timestamp || Date.now()),
+            },
         });
     } catch (error) {
-        logger.logJobError(job.videoId, error);
-        metricsService.recordTranscodingError(job.videoId, error);
+        logger.error('Video processing failed', { messageId, videoId, error });
 
-        const willRetry = await queue.retryJob(job);
-        if (!willRetry) {
-            await cleanup.cleanupTranscodedFile(job.videoId);
+        // Send detailed error message
+        await kafka.sendMessage(config.kafka.topics.failed, {
+            messageId,
+            videoId,
+            status: 'failed',
+            error: {
+                message: error.message,
+                code: error.code,
+                retryable:
+                    error instanceof TranscodingError && error.isOperational,
+            },
+            profile,
+            timestamp: Date.now(),
+        });
+
+        // Ensure cleanup on failure
+        try {
+            await cleanup.cleanupTranscodedFile(videoId);
+        } catch (cleanupError) {
+            logger.error('Cleanup failed after processing error', {
+                videoId,
+                cleanupError,
+            });
         }
-
-        await kafka.sendMessage(
-            willRetry ? 'Transcoding-Retry' : 'Transcoding-Failed',
-            {
-                videoId: job.videoId,
-                error: error.message,
-                attempts: job.attempts + 1,
-                nextRetry: willRetry
-                    ? Date.now() + queue.calculateBackoff(job.attempts + 1)
-                    : null,
-                metrics: metricsService.getMetricsSummary(),
-            }
-        );
-    } finally {
-        await queue.completeJob(job.videoId);
     }
 }
+
+// Improve Kafka consumer setup with batching and error handling
+kafka.consumer.run({
+    eachBatchAutoResolve: false,
+    eachBatch: async ({ batch, resolveOffset, heartbeat }) => {
+        for (const message of batch.messages) {
+            try {
+                const data = JSON.parse(message.value.toString());
+                await processVideo(data);
+                await resolveOffset(message.offset);
+                await heartbeat();
+            } catch (error) {
+                logger.error('Error processing message batch', { error });
+                // Continue processing other messages in batch
+            }
+        }
+    },
+});
 
 // Graceful shutdown
 async function shutdown(signal) {
     logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
-    // Stop queue processors
-    queueProcessors.forEach(clearInterval);
-
-    // Pause queue
-    queue.pause();
-
-    // Wait for active jobs
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    // Persist queue state
-    await queue.persistState();
-
-    // Close server
-    await new Promise((resolve) => app.close(resolve));
+    try {
+        await kafka.shutdown();
+    } catch (error) {
+        logger.error('Error during Kafka shutdown:', error);
+    }
 
     process.exit(0);
 }
-
-// Kafka consumer setup
-consumer.on('message', async (message) => {
-    try {
-        const data = JSON.parse(message.value);
-        if (await validator.validateJobRequest(data)) {
-            await queue.addJob(data);
-            logger.info('Added new transcoding job', { videoId: data.videoId });
-        }
-    } catch (error) {
-        logger.error('Error processing Kafka message', { error });
-    }
-});
 
 // Signal handlers
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-// Express middleware
-app.use(securityMiddleware);
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-app.use(compression());
-app.use(timeout('30s'));
-app.use(haltOnTimedout);
-app.use(requestLogger);
-
 // Routes
 app.use('/health', healthRoutes);
-app.use('/api/v1/transcode', require('./routes/transcode'));
 
-// Error handling
-app.use(errorHandler);
-
-function haltOnTimedout(req, res, next) {
-    if (!req.timedout) next();
-}
-
-async function startApplication() {
-    try {
-        // Initialize all services
-        await registry.initializeAll();
-
-        // Start HTTP server
-        const server = app.listen(port, () => {
-            logger.info(`Service running on port ${port}`);
-        });
-
-        // Graceful shutdown
-        async function shutdown(signal) {
-            logger.info(`${signal} received, starting graceful shutdown`);
-
-            // Stop accepting new requests
-            server.close();
-
-            // Shutdown all services
-            await registry.shutdownAll();
-
-            process.exit(0);
-        }
-
-        // Handle shutdown signals
-        process.on('SIGTERM', () => shutdown('SIGTERM'));
-        process.on('SIGINT', () => shutdown('SIGINT'));
-    } catch (error) {
-        logger.error('Failed to start application:', error);
-        process.exit(1);
-    }
-}
-
-startApplication();
-
-// Global error handling
-process.on('uncaughtException', (error) => {
-    logger.error('Uncaught Exception', { error });
-    process.exit(1);
+// Start server
+app.listen(port, () => {
+    logger.info(`Service running on port ${port}`);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection', { reason, promise });
-});
+init();
 
 module.exports = app;

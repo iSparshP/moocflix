@@ -1,46 +1,31 @@
 # Use Node.js base image with FFmpeg
 FROM node:16-alpine
 
-# Install FFmpeg and other required dependencies
+# Install FFmpeg and essential dependencies
 RUN apk add --no-cache \
     ffmpeg \
     python3 \
     make \
-    g++ \
-    jpeg-dev \
-    cairo-dev \
-    giflib-dev \
-    pango-dev \
-    libtool \
-    autoconf \
-    automake
+    g++
 
 # Create app directory
 WORKDIR /app
 
 # Install app dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm install --production
 
 # Bundle app source
 COPY . .
 
-# Create directories for temporary video processing
-RUN mkdir -p /app/temp/videos
-RUN mkdir -p /app/temp/processed
+# Create directories for video processing
+RUN mkdir -p /app/temp/videos /app/temp/processed
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV KAFKA_HOST=kafka:9092
-ENV KAFKA_TRANSCODE_TOPIC=video-transcoding
-ENV HEALTH_CHECK_PORT=3001
 
-# Add wait-for-kafka script
-COPY wait-for-kafka.sh /wait-for-kafka.sh
-RUN chmod +x /wait-for-kafka.sh
+# Expose service ports
+EXPOSE 3006 3001
 
-# Expose ports for the service and health check
-EXPOSE 3004 3001
-
-# Wait for Kafka to be ready before starting the service
-CMD ["/wait-for-kafka.sh", "node", "src/index.js"]
+# Start the service
+CMD ["node", "src/index.js"]

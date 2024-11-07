@@ -1,59 +1,91 @@
 const ffmpeg = require('fluent-ffmpeg');
-const path = require('path');
-const fs = require('fs');
+const { sendMessage } = require('../config/kafka');
 const logger = require('../utils/logger');
-const { TRANSCODING_PROFILES } = require('../constants/profiles');
-const { paths } = require('../config/env');
-const {
-    TranscodingError,
-    ValidationError,
-} = require('../middleware/errorHandler');
+const { TranscodingError } = require('../middleware/errorHandler');
+const { getProfile } = require('../constants/profiles');
+const path = require('path');
+const { paths } = require('../config/config');
 
-exports.transcodeVideo = async (videoId, profile = 'default') => {
-    logger.info(`Starting video transcoding`, { videoId, profile });
+class TranscodeService {
+    async transcodeVideo(videoId, profile = 'default', progressCallback) {
+        const inputPath = path.join(paths.input, `${videoId}.mp4`);
+        const outputPath = path.join(paths.output, `${videoId}_${profile}.mp4`);
 
-    if (!videoId) {
-        throw new ValidationError('Video ID is required');
+        try {
+            const profileSettings = getProfile(profile);
+
+            return new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .videoBitrate(profileSettings.videoBitrate)
+                    .audioBitrate(profileSettings.audioBitrate)
+                    .size(`?x${profileSettings.resolution.replace('p', '')}`)
+                    .on('start', () => {
+                        logger.info(
+                            `Starting transcoding for video ${videoId}`,
+                            {
+                                profile,
+                                settings: profileSettings,
+                            }
+                        );
+                    })
+                    .on('progress', (progress) => {
+                        if (progressCallback) {
+                            progressCallback(Math.floor(progress.percent));
+                        }
+
+                        // Send progress updates via Kafka with more metadata
+                        sendMessage('Transcoding-Progress', {
+                            videoId,
+                            progress: Math.floor(progress.percent),
+                            profile,
+                            timestamp: Date.now(),
+                            stats: {
+                                fps: progress.frames,
+                                speed: progress.currentFps,
+                                time: progress.timemark,
+                            },
+                        }).catch((err) =>
+                            logger.error('Failed to send progress update', {
+                                error: err,
+                                videoId,
+                            })
+                        );
+                    })
+                    .on('end', () => {
+                        logger.info(
+                            `Transcoding completed for video ${videoId}`,
+                            { profile }
+                        );
+                        resolve(outputPath);
+                    })
+                    .on('error', (err) => {
+                        logger.error(
+                            `Transcoding failed for video ${videoId}`,
+                            {
+                                error: err,
+                                profile,
+                                inputPath,
+                            }
+                        );
+                        reject(
+                            new TranscodingError(
+                                `Transcoding failed: ${err.message}`,
+                                videoId,
+                                { profile, inputPath }
+                            )
+                        );
+                    })
+                    .save(outputPath);
+            });
+        } catch (error) {
+            logger.error(`Error in transcodeVideo for ${videoId}:`, error);
+            throw new TranscodingError(
+                `Failed to transcode video: ${error.message}`,
+                videoId,
+                { profile }
+            );
+        }
     }
+}
 
-    const selectedProfile =
-        TRANSCODING_PROFILES[profile] || TRANSCODING_PROFILES.default;
-    const inputPath = path.join(paths.input, `${videoId}.mp4`);
-    const outputPath = path.join(paths.output, `${videoId}-${profile}.mp4`);
-
-    // Verify input file exists
-    if (!fs.existsSync(inputPath)) {
-        throw new ValidationError(
-            `Input file not found for video ID: ${videoId}`
-        );
-    }
-
-    return new Promise((resolve, reject) => {
-        ffmpeg(inputPath)
-            .output(outputPath)
-            .videoCodec('libx264')
-            .size(selectedProfile.resolution)
-            .videoBitrate(selectedProfile.videoBitrate)
-            .audioBitrate(selectedProfile.audioBitrate)
-            .on('progress', (progress) => {
-                logger.debug('Transcoding progress', { videoId, progress });
-            })
-            .on('end', () => {
-                logger.info(`Transcoding completed`, { videoId, profile });
-                resolve(outputPath);
-            })
-            .on('error', (err) => {
-                logger.error(`Transcoding failed`, {
-                    videoId,
-                    error: err.message,
-                });
-                reject(
-                    new TranscodingError(
-                        `Transcoding failed: ${err.message}`,
-                        videoId
-                    )
-                );
-            })
-            .run();
-    });
-};
+module.exports = new TranscodeService();

@@ -3,12 +3,15 @@ version: '3.8'
 services:
   transcoding-service:
     build: .
+    container_name: transcoding-service
+    restart: unless-stopped
     ports:
       - "3006:3006"
       - "3001:3001"
     volumes:
       - ./videos/input:/app/temp/videos
       - ./videos/output:/app/temp/processed
+      - ${KAFKA_SSL_CERTS_PATH}:/app/src/certs:ro
     environment:
       - NODE_ENV=production
       - KAFKA_BROKERS=${KAFKA_BROKERS}
@@ -16,24 +19,22 @@ services:
       - KAFKA_USERNAME=${KAFKA_USERNAME}
       - KAFKA_PASSWORD=${KAFKA_PASSWORD}
       - KAFKA_TRANSCODE_TOPIC=${KAFKA_TRANSCODE_TOPIC}
-      - KAFKA_STATUS_TOPIC=${KAFKA_STATUS_TOPIC}
       - REDIS_URL=${REDIS_URL}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - REDIS_DATABASE=${REDIS_DATABASE}
       - INPUT_VIDEO_PATH=/app/temp/videos
       - OUTPUT_VIDEO_PATH=/app/temp/processed
-    networks:
-      - moocflix-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3006/api/v1/health/liveness"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 5s
+    networks:
+      - app-network
 
 volumes:
   redis-data:
 
 networks:
-  moocflix-network:
+  app-network:
+    name: moocflix-network
     external: true

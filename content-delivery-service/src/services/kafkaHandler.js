@@ -49,6 +49,31 @@ const handleIncomingMessage = async (topic, message) => {
                 await redisClient.del(`video:${videoId}`);
                 break;
 
+            case 'Transcoding-Progress':
+                await Video.update(
+                    {
+                        transcoding_progress: message.progress,
+                        status: 'transcoding',
+                    },
+                    { where: { id: message.videoId } }
+                );
+                break;
+
+            case 'Transcoding-Failed':
+                await Video.update(
+                    {
+                        status: 'failed',
+                        error_message: message.error.message,
+                        transcoding_progress: 0,
+                        metadata: {
+                            error: message.error,
+                            failedAt: new Date(message.timestamp),
+                        },
+                    },
+                    { where: { id: message.videoId } }
+                );
+                break;
+
             default:
                 console.warn(`Unhandled topic: ${topic}`);
         }
@@ -68,7 +93,12 @@ const initializeKafkaConsumer = async () => {
     while (retries < maxRetries) {
         try {
             await consumeMessages(
-                ['Student-Enrolled', 'Transcoding-Completed'],
+                [
+                    'Student-Enrolled',
+                    'Transcoding-Completed',
+                    'Transcoding-Progress',
+                    'Transcoding-Failed',
+                ],
                 handleIncomingMessage
             );
             console.log('Kafka consumer initialized successfully');

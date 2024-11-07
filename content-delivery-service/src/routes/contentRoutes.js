@@ -4,6 +4,7 @@ const contentController = require('../controllers/contentController');
 const validateUpload = require('../middlewares/validateUpload');
 const validateRequest = require('../middlewares/validateRequest');
 const schemas = require('../validations/schemas');
+const { authorize, checkPermission } = require('../middlewares/roleAuth');
 const router = express.Router();
 
 /**
@@ -63,6 +64,7 @@ const router = express.Router();
  */
 router.post(
     '/upload',
+    authorize('instructor', 'admin'),
     validateUpload,
     validateRequest(schemas.uploadVideo),
     contentController.uploadVideo
@@ -148,7 +150,7 @@ router.get(
  */
 router.get(
     '/:videoId/stream',
-    validateRequest(schemas.videoId, 'params'),
+    checkPermission('VIEW_VIDEO'),
     contentController.streamVideo
 );
 
@@ -339,6 +341,34 @@ router.post(
     validateRequest(schemas.courseId, 'params'),
     validateRequest(schemas.enrollment),
     contentController.enrollStudent
+);
+
+router.post(
+    '/videos/upload',
+    authorize('instructor', 'admin'),
+    validateRequest(schemas.videoUpload),
+    upload.single('video'),
+    async (req, res, next) => {
+        try {
+            const video = await videoService.uploadVideo(
+                req.file,
+                req.body.courseId,
+                req.user.id
+            );
+
+            res.status(201).json({
+                status: 'success',
+                message: 'Video upload initiated',
+                data: {
+                    videoId: video.id,
+                    status: video.status,
+                    estimatedProcessingTime: '5-10 minutes',
+                },
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 );
 
 module.exports = router;

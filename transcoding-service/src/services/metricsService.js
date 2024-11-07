@@ -334,6 +334,20 @@ class MetricsService extends EventEmitter {
             }
         );
     }
+
+    async trackProgress(videoId, progress) {
+        try {
+            await kafkaClient.sendMessage(config.kafka.topics.progress, {
+                videoId,
+                progress,
+                timestamp: Date.now(),
+            });
+
+            logger.info(`Progress update for video ${videoId}: ${progress}%`);
+        } catch (error) {
+            logger.error('Failed to send progress update:', error);
+        }
+    }
 }
 
 const metricsService = new MetricsService();
