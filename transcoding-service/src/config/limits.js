@@ -31,4 +31,7 @@ const retry = {
     initialDelay: 1000,
 };
 
-module.exports = { limits, retry };
+module.exports = {
+    limits,
+    retry,
+};

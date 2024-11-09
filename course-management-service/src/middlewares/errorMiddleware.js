@@ -28,7 +28,7 @@ class ValidationError extends AppError {
     }
 }
 
-const errorHandler = (err, req, res, next) => {
+const errorMiddleware = (err, req, res, next) => {
     // Log error with consistent format
     logger.error('Error encountered:', {
         path: req.path,
@@ -71,10 +71,4 @@ const errorHandler = (err, req, res, next) => {
     });
 };
 
-module.exports = {
-    errorHandler,
-    AppError,
-    NotFoundError,
-    UnauthorizedError,
-    ValidationError,
-};
+module.exports = errorMiddleware;

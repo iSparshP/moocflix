@@ -30,4 +30,29 @@ const consumeMessages = async (topics, callback) => {
     });
 };
 
-module.exports = { sendMessage, consumeMessages };
+const checkKafkaHealth = async () => {
+    try {
+        if (!producer) {
+            throw new Error('Kafka producer not initialized');
+        }
+
+        const isConnected = producer.isConnected();
+        if (!isConnected) {
+            throw new Error('Kafka producer is not connected');
+        }
+
+        return {
+            status: 'healthy',
+            type: 'kafka',
+        };
+    } catch (error) {
+        logger.error('Kafka health check failed:', { error: error.message });
+        return {
+            status: 'unhealthy',
+            type: 'kafka',
+            error: error.message,
+        };
+    }
+};
+
+module.exports = { sendMessage, consumeMessages, checkKafkaHealth };

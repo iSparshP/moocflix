@@ -2,7 +2,7 @@
 const os = require('os');
 const fs = require('fs').promises;
 const path = require('path');
-const { limits, retry } = require('../config/resources');
+const { limits, retry } = require('../config/limits');
 const { ValidationError } = require('../middleware/errorHandler');
 const registry = require('../utils/serviceRegistry');
 const metricsService = registry.get('metrics');
@@ -10,8 +10,14 @@ const TranscodingCircuitBreaker = require('../utils/circuitBreaker');
 const BaseService = require('./baseService');
 
 class PriorityQueue extends BaseService {
-    constructor() {
+    constructor(serviceRegistry) {
         super();
+        if (!serviceRegistry) {
+            throw new Error('ServiceRegistry is required');
+        }
+        this.serviceRegistry = serviceRegistry;
+        this.redisClient = null;
+        this.kafkaClient = null;
         this.queues = {
             high: [],
             normal: [],
@@ -21,35 +27,57 @@ class PriorityQueue extends BaseService {
         this.failedJobs = new Map();
         this.persistPath = path.join(process.cwd(), 'data', 'queue-state.json');
         this.paused = false;
-        this.breaker = TranscodingCircuitBreaker.create('queue');
+
+        this.breaker = TranscodingCircuitBreaker.create(
+            'queue',
+            async (job) => {
+                if (this.paused) {
+                    throw new ValidationError('Queue is paused');
+                }
+
+                if (
+                    this.queues[job.priority].length >=
+                    limits.queueSizeLimit[job.priority]
+                ) {
+                    throw new ValidationError(`Queue ${job.priority} is full`);
+                }
+
+                const jobWithRetry = {
+                    ...job,
+                    id:
+                        job.id ||
+                        `job-${Date.now()}-${Math.random()
+                            .toString(36)
+                            .slice(2)}`,
+                    attempts: job.attempts || 0,
+                    addedAt: Date.now(),
+                };
+
+                this.queues[job.priority].push(jobWithRetry);
+                await this.persistState();
+                return jobWithRetry.id;
+            }
+        );
+    }
+
+    async initialize() {
+        this.redisClient = this.serviceRegistry.get('redis');
+        this.kafkaClient = this.serviceRegistry.get('kafka');
+
+        if (!this.redisClient || !this.kafkaClient) {
+            throw new Error('Required services not found in registry');
+        }
+
+        // Initialize any queue-specific setup here
+        await this.setupQueues();
+    }
+
+    async setupQueues() {
+        // Setup your queues here
     }
 
     async addJob(job, priority = 'normal') {
-        return this.breaker.fire(async () => {
-            if (this.paused) {
-                throw new ValidationError('Queue is paused');
-            }
-
-            if (
-                this.queues[priority].length >= limits.queueSizeLimit[priority]
-            ) {
-                throw new ValidationError(`Queue ${priority} is full`);
-            }
-
-            const jobWithRetry = {
-                ...job,
-                id:
-                    job.id ||
-                    `job-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                attempts: job.attempts || 0,
-                priority,
-                addedAt: Date.now(),
-            };
-
-            this.queues[priority].push(jobWithRetry);
-            await this.persistState();
-            return jobWithRetry.id;
-        });
+        return this.breaker.fire({ ...job, priority });
     }
 
     getNextJob() {
@@ -223,9 +251,8 @@ class PriorityQueue extends BaseService {
     }
 
     async init() {
-        await super.init();
         await this.recover();
-        this.emit('queue:initialized');
+        return true;
     }
 
     async shutdown() {
@@ -234,5 +261,5 @@ class PriorityQueue extends BaseService {
     }
 }
 
-const queue = new PriorityQueue();
+const queue = new PriorityQueue(registry);
 module.exports = queue;

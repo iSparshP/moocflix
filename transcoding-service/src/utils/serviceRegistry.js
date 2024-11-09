@@ -8,11 +8,19 @@ class ServiceRegistry extends EventEmitter {
     }
 
     register(name, service) {
+        if (!name || !service) {
+            throw new Error(
+                'Both name and service are required for registration'
+            );
+        }
         this.services.set(name, service);
         logger.info(`Service registered: ${name}`);
     }
 
     get(name) {
+        if (!this.services.has(name)) {
+            throw new Error(`Service '${name}' not found in registry`);
+        }
         return this.services.get(name);
     }
 

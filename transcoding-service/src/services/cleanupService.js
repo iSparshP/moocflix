@@ -1,7 +1,7 @@
 // src/services/cleanupService.js
 const fs = require('fs').promises;
 const path = require('path');
-const { paths } = require('../config/env');
+const { paths } = require('../config/environment');
 const logger = require('../utils/logger');
 const BaseService = require('./baseService');
 

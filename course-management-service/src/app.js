@@ -2,23 +2,29 @@
 const express = require('express');
 const courseRoutes = require('./routes/courseRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const { defaultLimiter } = require('./middlewares/rateLimiter');
+const errorMiddleware = require('./middlewares/errorMiddleware');
+const rateLimiter = require('./middlewares/rateLimiter');
+const logger = require('./utils/logger');
 
 const app = express();
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(defaultLimiter);
+
+// Request logging
+app.use((req, res, next) => {
+    logger.info(`Incoming ${req.method} request to ${req.path}`);
+    next();
+});
 
 // Routes
 app.use('/api/v1/courses', courseRoutes);
-app.use('/', healthRoutes);
+app.use('/health', healthRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Internal Server Error' });
-});
-
-// Uses port from environment variable or 3002
-const port = process.env.PORT || 3002;
+// Error handling
+app.use(errorMiddleware);
 
 module.exports = app;

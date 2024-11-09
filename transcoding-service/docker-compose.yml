@@ -1,33 +1,61 @@
-version: '3.8'
-
 services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+
   transcoding-service:
     build: .
     container_name: transcoding-service
     restart: unless-stopped
     ports:
-      - "3006:3006"
-      - "3001:3001"
+      - "3004:3004"
+      - "3005:3005"
     volumes:
       - ./videos/input:/app/temp/videos
       - ./videos/output:/app/temp/processed
-      - ${KAFKA_SSL_CERTS_PATH}:/app/src/certs:ro
+      - ./certs:/app/src/certs:ro
     environment:
-      - NODE_ENV=production
-      - KAFKA_BROKERS=${KAFKA_BROKERS}
-      - KAFKA_CLIENT_ID=${KAFKA_CLIENT_ID}
+      - NODE_ENV=development
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-localhost:9092}
+      - KAFKA_CLIENT_ID=${KAFKA_CLIENT_ID:-transcoding-service}
+      - KAFKA_GROUP_ID=${KAFKA_GROUP_ID:-transcoding-group}
+      - KAFKA_SSL=false
+      - KAFKA_SASL=false
+      - KAFKA_SASL_MECHANISM=${KAFKA_SASL_MECHANISM}
       - KAFKA_USERNAME=${KAFKA_USERNAME}
       - KAFKA_PASSWORD=${KAFKA_PASSWORD}
-      - KAFKA_TRANSCODE_TOPIC=${KAFKA_TRANSCODE_TOPIC}
-      - REDIS_URL=${REDIS_URL}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_TLS=false
+      - REDIS_TLS_REJECT_UNAUTHORIZED=false
       - INPUT_VIDEO_PATH=/app/temp/videos
       - OUTPUT_VIDEO_PATH=/app/temp/processed
+      - LOG_LEVEL=debug
+      - HEALTH_CHECK_HOST=localhost
+      - HEALTH_CHECK_PORT=3005
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
+      - KAFKA_SSL_REJECT_UNAUTHORIZED=false
+      # Resource Limits
+      - MAX_CONCURRENT_JOBS=2
+      - MAX_MEMORY_USAGE=0.8
+      - MAX_CPU_USAGE=0.9
+      - MAX_DISK_USAGE=0.9
+      - HIGH_QUEUE_LIMIT=100
+      - NORMAL_QUEUE_LIMIT=200
+      - LOW_QUEUE_LIMIT=300
+      - MAX_RETRY_ATTEMPTS=3
+    depends_on:
+      - redis
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health/live"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3005/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
     networks:
       - app-network
 
@@ -36,5 +64,4 @@ volumes:
 
 networks:
   app-network:
-    name: moocflix-network
-    external: true
+    driver: bridge

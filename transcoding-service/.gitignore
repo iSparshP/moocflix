@@ -4,3 +4,10 @@
 .DS_Store
 .env
 .env.*
+*.crt
+*.key
+*.pem
+ssl/
+certificates/
+/certs
+/videos

@@ -1,4 +1,4 @@
-FROM node:16-alpine
+FROM node:22-alpine
 
 # Add dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -9,19 +9,24 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Set working directory
 WORKDIR /app
 
-# Copy package files first to leverage Docker cache
+# Copy package files first
 COPY package*.json ./
 
-# Install dependencies with specific flags for production
-RUN npm ci --only=production \
-    && npm cache clean --force
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
 
-# Copy application code with proper ownership
-COPY --chown=appuser:appgroup . .
+# Create src directory
+RUN mkdir -p /app/src
 
-# Set permissions
-RUN chmod -R 550 /app \
-    && chmod -R 770 /app/logs
+# Copy source code
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Create logs directory and set permissions
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app && \
+    chmod -R 550 /app && \
+    chmod -R 770 /app/logs
 
 # Set environment variables
 ENV NODE_ENV=production \

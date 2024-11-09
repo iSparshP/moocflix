@@ -15,11 +15,18 @@ class TranscodingCircuitBreaker {
     }
 
     create(name, fn) {
-        const breaker = new CircuitBreaker(fn, breakerOptions);
+        if (typeof fn !== 'function') {
+            throw new Error('Circuit breaker requires a function to execute');
+        }
 
-        breaker.fallback(() => {
-            logger.warn(`Circuit ${name} fallback triggered`);
-            return { error: 'Service temporarily unavailable' };
+        const breaker = new CircuitBreaker(fn, {
+            ...breakerOptions,
+            name: name,
+        });
+
+        breaker.fallback((error) => {
+            logger.warn(`Circuit ${name} fallback triggered`, { error });
+            throw new ResourceError('Service temporarily unavailable');
         });
 
         breaker.on('success', () => {
@@ -30,12 +37,24 @@ class TranscodingCircuitBreaker {
             logger.error(`Circuit ${name} failed`, { error });
         });
 
+        breaker.on('timeout', () => {
+            logger.warn(`Circuit ${name} timeout`);
+        });
+
+        breaker.on('reject', () => {
+            logger.warn(`Circuit ${name} rejected`);
+        });
+
         this.breakers.set(name, breaker);
         return breaker;
     }
 
     get(name) {
-        return this.breakers.get(name);
+        const breaker = this.breakers.get(name);
+        if (!breaker) {
+            throw new Error(`Circuit breaker ${name} not found`);
+        }
+        return breaker;
     }
 }
 

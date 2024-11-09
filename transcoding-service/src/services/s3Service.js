@@ -1,15 +1,22 @@
-const AWS = require('aws-sdk');
+const {
+    S3Client,
+    GetObjectCommand,
+    PutObjectCommand,
+} = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const fs = require('fs');
 const path = require('path');
-const { paths } = require('../config/env');
+const { paths } = require('../config/environment');
 const logger = require('../utils/logger');
 
 class S3Service {
     constructor() {
-        this.s3 = new AWS.S3({
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        this.client = new S3Client({
             region: process.env.AWS_REGION,
+            credentials: {
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            },
         });
         this.bucket = process.env.S3_BUCKET_NAME;
     }
@@ -21,16 +28,15 @@ class S3Service {
         logger.info(`Downloading video from S3`, { videoId });
 
         try {
-            const s3Stream = this.s3
-                .getObject({
-                    Bucket: this.bucket,
-                    Key: `uploads/${videoId}.mp4`,
-                })
-                .createReadStream();
+            const command = new GetObjectCommand({
+                Bucket: this.bucket,
+                Key: `uploads/${videoId}.mp4`,
+            });
+
+            const response = await this.client.send(command);
 
             await new Promise((resolve, reject) => {
-                s3Stream
-                    .pipe(writeStream)
+                response.Body.pipe(writeStream)
                     .on('error', reject)
                     .on('finish', resolve);
             });
@@ -40,9 +46,11 @@ class S3Service {
         } catch (error) {
             logger.error(`Failed to download video from S3`, {
                 videoId,
-                error,
+                error: error.message,
             });
             throw error;
+        } finally {
+            writeStream.end();
         }
     }
 
@@ -53,20 +61,79 @@ class S3Service {
         logger.info(`Uploading transcoded video to S3`, { videoId, profile });
 
         try {
-            await this.s3
-                .upload({
+            // Use multipart upload for large files
+            const upload = new Upload({
+                client: this.client,
+                params: {
                     Bucket: this.bucket,
                     Key: `transcoded/${videoId}-${profile}.mp4`,
                     Body: fileStream,
                     ContentType: 'video/mp4',
-                })
-                .promise();
+                    Metadata: {
+                        'transcoding-profile': profile,
+                        'original-video-id': videoId,
+                        'transcoded-date': new Date().toISOString(),
+                    },
+                },
+                queueSize: 4, // number of concurrent uploads
+                partSize: 5 * 1024 * 1024, // 5MB part size
+            });
+
+            upload.on('httpUploadProgress', (progress) => {
+                logger.debug('Upload progress', {
+                    videoId,
+                    loaded: progress.loaded,
+                    total: progress.total,
+                });
+            });
+
+            await upload.done();
 
             logger.info(`Video uploaded successfully`, { videoId, profile });
             return `transcoded/${videoId}-${profile}.mp4`;
         } catch (error) {
-            logger.error(`Failed to upload video to S3`, { videoId, error });
+            logger.error(`Failed to upload video to S3`, {
+                videoId,
+                error: error.message,
+            });
             throw error;
+        } finally {
+            fileStream.destroy();
+        }
+    }
+
+    async checkVideoExists(videoId) {
+        try {
+            const command = new GetObjectCommand({
+                Bucket: this.bucket,
+                Key: `uploads/${videoId}.mp4`,
+            });
+            await this.client.send(command);
+            return true;
+        } catch (error) {
+            if (error.name === 'NoSuchKey') {
+                return false;
+            }
+            throw error;
+        }
+    }
+
+    async cleanup(videoId) {
+        try {
+            const inputPath = path.join(paths.input, `${videoId}.mp4`);
+            const outputPath = path.join(paths.output, `${videoId}-*.mp4`);
+
+            await fs.promises.unlink(inputPath).catch(() => {});
+
+            // Cleanup all transcoded versions
+            const files = await fs.promises.readdir(paths.output);
+            for (const file of files) {
+                if (file.startsWith(`${videoId}-`)) {
+                    await fs.promises.unlink(path.join(paths.output, file));
+                }
+            }
+        } catch (error) {
+            logger.error(`Error cleaning up files for ${videoId}:`, error);
         }
     }
 }

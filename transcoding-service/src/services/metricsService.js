@@ -2,12 +2,11 @@
 const os = require('os');
 const fs = require('fs').promises;
 const { EventEmitter } = require('events');
-const { limits } = require('../config/resources');
-const { paths } = require('../config/env');
+const { limits } = require('../config/limits');
+const { paths } = require('../config/environment');
 const metricsPersistence = require('./metricsPersistence');
-const registry = require('./serviceRegistry');
+const registry = require('../utils/serviceRegistry');
 const kafkaClient = require('./kafka/kafkaClient');
-const config = require('../config/environment');
 const logger = require('../utils/logger');
 
 class MetricsService extends EventEmitter {
@@ -34,6 +33,25 @@ class MetricsService extends EventEmitter {
             },
         };
 
+        // Initialize handlers first before binding
+        this.handleJobComplete = (data) => {
+            this.completeTranscodingJob(data.videoId, data.outputSize);
+        };
+
+        this.handleJobFailed = (data) => {
+            this.recordTranscodingError(data.videoId, data.error);
+        };
+
+        this.handleResourceAllocation = (data) => {
+            // Add resource allocation tracking logic here
+            logger.info('Resource allocation event received', data);
+        };
+
+        // Now bind the event listeners
+        registry.on('job:complete', this.handleJobComplete);
+        registry.on('job:failed', this.handleJobFailed);
+        registry.on('resources:allocated', this.handleResourceAllocation);
+
         this.startSystemMetricsCollection();
 
         // Store metrics periodically
@@ -41,18 +59,12 @@ class MetricsService extends EventEmitter {
             const metrics = this.getMetricsSummary();
             await metricsPersistence.persistMetrics(metrics);
         }, 60000); // Store every minute
-
-        registry.on('job:complete', this.handleJobComplete.bind(this));
-        registry.on('job:failed', this.handleJobFailed.bind(this));
-        registry.on(
-            'resources:allocated',
-            this.handleResourceAllocation.bind(this)
-        );
     }
 
     async init() {
         await metricsPersistence.init();
         this.startSystemMetricsCollection();
+        return true;
     }
 
     async checkResources() {
@@ -169,15 +181,15 @@ class MetricsService extends EventEmitter {
     }
 
     startSystemMetricsCollection() {
-        const COLLECTION_INTERVAL = 1000; // 1 second
+        // Set up periodic collection of system metrics
         setInterval(async () => {
             try {
-                await this.collectSystemMetrics();
-                this.emit('metrics-updated', this.metrics);
+                const metrics = await this.collectSystemMetrics();
+                this.emit('metrics:update', metrics);
             } catch (error) {
-                console.error('Error collecting metrics:', error);
+                logger.error('Error collecting system metrics:', error);
             }
-        }, COLLECTION_INTERVAL);
+        }, 60000); // Collect every minute
     }
 
     aggregateMetrics(metrics) {
@@ -244,24 +256,46 @@ class MetricsService extends EventEmitter {
         const job = this.metrics.transcoding.get(videoId);
         if (job) {
             const duration = Date.now() - job.startTime;
-            transcodingMetrics.jobDuration.observe(
-                { profile: job.profile },
-                duration / 1000
-            );
-            this.metrics.transcoding.delete(videoId);
+            try {
+                // Only call if transcodingMetrics exists
+                if (
+                    typeof transcodingMetrics !== 'undefined' &&
+                    transcodingMetrics.jobDuration
+                ) {
+                    transcodingMetrics.jobDuration.observe(
+                        { profile: job.profile },
+                        duration / 1000
+                    );
+                }
+                this.metrics.transcoding.delete(videoId);
+            } catch (error) {
+                logger.error('Error recording job completion metrics:', error);
+            }
         }
     }
 
     recordTranscodingError(videoId, error) {
-        transcodingMetrics.failureRate.inc({
-            reason:
-                error.name === 'TranscodingError' ? 'transcoding' : 'system',
-        });
+        try {
+            // Only call if transcodingMetrics exists
+            if (
+                typeof transcodingMetrics !== 'undefined' &&
+                transcodingMetrics.failureRate
+            ) {
+                transcodingMetrics.failureRate.inc({
+                    reason:
+                        error.name === 'TranscodingError'
+                            ? 'transcoding'
+                            : 'system',
+                });
+            }
 
-        const job = this.metrics.transcoding.get(videoId);
-        if (job) {
-            job.status = 'failed';
-            job.error = error.message;
+            const job = this.metrics.transcoding.get(videoId);
+            if (job) {
+                job.status = 'failed';
+                job.error = error.message;
+            }
+        } catch (err) {
+            logger.error('Error recording transcoding error metrics:', err);
         }
     }
 
@@ -296,11 +330,27 @@ class MetricsService extends EventEmitter {
     }
 
     async collectCleanupMetrics() {
-        const cleanup = this.registry.get('cleanup');
-        return {
-            lastRun: await cleanup.getLastRunMetrics(),
-            storage: await cleanup.getStorageMetrics(),
-        };
+        try {
+            const cleanup = this.registry.get('cleanup');
+            if (!cleanup) {
+                logger.warn('Cleanup service not found in registry');
+                return {
+                    lastRun: null,
+                    storage: null,
+                };
+            }
+            return {
+                lastRun: await cleanup.getLastRunMetrics(),
+                storage: await cleanup.getStorageMetrics(),
+            };
+        } catch (error) {
+            logger.error('Error collecting cleanup metrics:', error);
+            return {
+                lastRun: null,
+                storage: null,
+                error: error.message,
+            };
+        }
     }
 
     async recordTranscodingMetrics(videoId, metrics) {

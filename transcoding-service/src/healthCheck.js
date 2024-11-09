@@ -4,7 +4,7 @@ const { errorHandler } = require('./middleware/errorHandler');
 const healthRoutes = require('./routes/health');
 
 const app = express();
-const port = process.env.HEALTH_CHECK_PORT || 3001;
+const port = process.env.HEALTH_CHECK_PORT || 3005;
 
 // Middleware
 app.use(express.json());

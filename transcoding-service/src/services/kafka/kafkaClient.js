@@ -1,4 +1,4 @@
-const { Kafka, logLevel } = require('kafkajs');
+const { Kafka, Partitioners, logLevel } = require('kafkajs');
 const config = require('../../config/environment');
 const logger = require('../../utils/logger');
 
@@ -10,35 +10,92 @@ class KafkaClient {
             ssl: config.kafka.ssl,
             sasl: config.kafka.sasl,
             logLevel: logLevel.INFO,
-            retry: {
-                initialRetryTime: 100,
-                retries: 8,
-            },
+            connectionTimeout: config.kafka.connectionTimeout,
+            retry: config.kafka.retry,
+            authenticationTimeout: 10000,
         });
 
         this.producer = this.kafka.producer({
             allowAutoTopicCreation: true,
             transactionTimeout: 30000,
+            createPartitioner: Partitioners.LegacyPartitioner,
         });
 
         this.consumer = this.kafka.consumer({
-            groupId: `${config.kafka.clientId}-group`,
+            groupId: config.kafka.groupId,
             maxWaitTimeInMs: 50,
             maxBytes: 5242880, // 5MB
         });
 
         this.admin = this.kafka.admin();
+
+        this.isConnected = false;
+        this.connectionRetryCount = 0;
+        this.maxRetries = config.kafka.retry.retries;
     }
 
     async connect() {
         try {
-            await this.producer.connect();
-            await this.consumer.connect();
-            await this.admin.connect();
+            if (this.isConnected) {
+                logger.warn('Already connected to Kafka');
+                return;
+            }
+
+            logger.info('Connecting to Kafka with config:', {
+                brokers: config.kafka.brokers,
+                clientId: config.kafka.clientId,
+                ssl: !!config.kafka.ssl,
+                sasl: !!config.kafka.sasl,
+            });
+
+            await Promise.all([
+                this.producer.connect(),
+                this.consumer.connect(),
+                this.admin.connect(),
+            ]);
+
+            await this.admin.listTopics();
+
+            this.isConnected = true;
+            this.connectionRetryCount = 0;
             logger.info('Successfully connected to Kafka');
         } catch (error) {
-            logger.error('Failed to connect to Kafka:', error);
-            throw error;
+            this.isConnected = false;
+            this.connectionRetryCount++;
+
+            logger.error('Failed to connect to Kafka:', {
+                error: error.message,
+                stack: error.stack,
+                broker: error.broker,
+                code: error.code,
+            });
+
+            if (this.connectionRetryCount >= this.maxRetries) {
+                throw new Error(
+                    `Failed to connect to Kafka after ${this.maxRetries} attempts`
+                );
+            }
+
+            const retryDelay = Math.min(
+                1000 * Math.pow(2, this.connectionRetryCount),
+                30000
+            );
+            await new Promise((resolve) => setTimeout(resolve, retryDelay));
+            return this.connect();
+        }
+    }
+
+    async healthCheck() {
+        try {
+            if (!this.isConnected) {
+                return false;
+            }
+            await this.admin.listTopics();
+            return true;
+        } catch (error) {
+            logger.error('Kafka health check failed:', error);
+            this.isConnected = false;
+            return false;
         }
     }
 
