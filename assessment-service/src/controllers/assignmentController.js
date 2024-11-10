@@ -1,9 +1,13 @@
 // src/controllers/assignmentController.js
+const { BaseController } = require('./baseController');
 const {
     saveAssignment,
     submitAssignmentAnswers,
     fetchAssignmentResult,
     gradeAssignmentSubmission,
+    fetchAssignments,
+    updateAssignment,
+    removeAssignment,
 } = require('../services/assignmentService');
 const {
     notifyAssignmentSubmissionCompleted,
@@ -12,136 +16,112 @@ const {
 } = require('../services/notificationService');
 const { validateCourseId } = require('../services/courseService');
 
-exports.createAssignment = async (req, res) => {
-    const { courseId } = req.params;
-    const assignmentData = req.body;
+class AssignmentController extends BaseController {
+    static async createAssignment(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId } = req.params;
+            const assignmentData = req.body;
 
-    try {
-        // Validate course ID
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
+            await validateCourseId(courseId);
+            const assignmentId = await saveAssignment(courseId, assignmentData);
+            await notifyStudents(courseId, assignmentId);
 
-        // Save assignment
-        const assignmentId = await saveAssignment(courseId, assignmentData);
-
-        // Notify students
-        await notifyStudents(courseId, assignmentId);
-
-        res.status(201).json({
-            message: 'Assignment created successfully',
-            assignmentId,
-        });
-    } catch (error) {
-        if (error instanceof NotFoundError) {
-            return res.status(404).json({
-                message: error.message,
-            });
-        }
-        if (error instanceof ValidationError) {
-            return res.status(400).json({
-                message: error.message,
-            });
-        }
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            return {
+                message: 'Assignment created successfully',
+                assignmentId,
+            };
         });
     }
-};
 
-exports.submitAssignment = async (req, res) => {
-    const { assignmentId } = req.params;
-    const submissionData = req.body;
+    static async submitAssignment(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { assignmentId } = req.params;
+            const submissionData = req.body;
 
-    try {
-        // Submit assignment answers
-        const submissionId = await submitAssignmentAnswers(
-            assignmentId,
-            submissionData
-        );
+            const submissionId = await submitAssignmentAnswers(
+                assignmentId,
+                submissionData
+            );
 
-        // Notify submission completed
-        await notifyAssignmentSubmissionCompleted(
-            req.params.courseId,
-            assignmentId,
-            submissionId
-        );
+            await notifyAssignmentSubmissionCompleted(
+                req.params.courseId,
+                assignmentId,
+                submissionId
+            );
 
-        res.status(201).json({
-            message: 'Assignment submitted successfully',
-            submissionId,
-        });
-    } catch (error) {
-        if (error instanceof NotFoundError) {
-            return res.status(404).json({
-                message: error.message,
-            });
-        }
-        if (error instanceof ValidationError) {
-            return res.status(400).json({
-                message: error.message,
-            });
-        }
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            return {
+                message: 'Assignment submitted successfully',
+                submissionId,
+            };
         });
     }
-};
 
-exports.getAssignmentResult = async (req, res) => {
-    const { assignmentId } = req.params;
-
-    try {
-        // Fetch assignment result
-        const result = await fetchAssignmentResult(assignmentId);
-        res.status(200).json(result);
-    } catch (error) {
-        if (error instanceof NotFoundError) {
-            return res.status(404).json({
-                message: error.message,
-            });
-        }
-        if (error instanceof ValidationError) {
-            return res.status(400).json({
-                message: error.message,
-            });
-        }
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+    static async getAssignmentResult(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { assignmentId } = req.params;
+            return await fetchAssignmentResult(assignmentId);
         });
     }
-};
 
-exports.gradeAssignment = async (req, res) => {
-    const { assignmentId } = req.params;
-    const { submissionId, grade } = req.body;
+    static async gradeAssignment(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { assignmentId } = req.params;
+            const { submissionId, grade } = req.body;
 
-    try {
-        // Grade assignment submission
-        await gradeAssignmentSubmission(assignmentId, submissionId, grade);
+            await gradeAssignmentSubmission(assignmentId, submissionId, grade);
+            await notifyAssignmentGradingCompleted(assignmentId, submissionId);
 
-        // Notify grading completed
-        await notifyAssignmentGradingCompleted(assignmentId, submissionId);
-
-        res.status(200).json({ message: 'Assignment graded successfully' });
-    } catch (error) {
-        if (error instanceof NotFoundError) {
-            return res.status(404).json({
-                message: error.message,
-            });
-        }
-        if (error instanceof ValidationError) {
-            return res.status(400).json({
-                message: error.message,
-            });
-        }
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            return { message: 'Assignment graded successfully' };
         });
     }
+
+    static async getAssignments(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId } = req.params;
+            await validateCourseId(courseId);
+            return await fetchAssignments(courseId);
+        });
+    }
+
+    static async updateAssignment(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, assignmentId } = req.params;
+            const assignmentData = req.body;
+
+            await validateCourseId(courseId);
+            await updateAssignment(courseId, assignmentId, assignmentData);
+
+            return { message: 'Assignment updated successfully' };
+        });
+    }
+
+    static async deleteAssignment(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, assignmentId } = req.params;
+
+            await validateCourseId(courseId);
+            await removeAssignment(courseId, assignmentId);
+
+            return { message: 'Assignment deleted successfully' };
+        });
+    }
+}
+
+// Export individual handler methods
+module.exports = {
+    createAssignment:
+        AssignmentController.createAssignment.bind(AssignmentController),
+    submitAssignment:
+        AssignmentController.submitAssignment.bind(AssignmentController),
+    getAssignmentResult:
+        AssignmentController.getAssignmentResult.bind(AssignmentController),
+    gradeAssignment:
+        AssignmentController.gradeAssignment.bind(AssignmentController),
+    getAssignments:
+        AssignmentController.getAssignments.bind(AssignmentController),
+    updateAssignment:
+        AssignmentController.updateAssignment.bind(AssignmentController),
+    deleteAssignment:
+        AssignmentController.deleteAssignment.bind(AssignmentController),
+    AssignmentController, // Keep the class export as well
 };

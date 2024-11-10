@@ -1,0 +1,5 @@
+2024-11-09 12:05:17:517 [INFO] Server is running on port 3000
+2024-11-09 12:05:17:517 [ERROR] Unhandled Rejection
+TypeError: logger.error is not a function
+    at connectDB (/usr/src/app/src/config/mongodb.js:12:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)

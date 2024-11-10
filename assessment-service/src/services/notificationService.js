@@ -1,111 +1,69 @@
 // src/services/notificationService.js
-const { send } = require('../config/kafka');
+const BaseService = require('./baseService');
+const { kafka } = require('../config/kafka');
 const { logger } = require('../config/logger');
 
-exports.notifyStudents = async (courseId, assignmentId) => {
-    try {
-        await send({
-            topic: 'Assessment-Creation',
-            messages: [{ value: JSON.stringify({ courseId, assignmentId }) }],
-        });
-        logger.info('Students notified of new assessment', {
-            courseId,
-            assignmentId,
-        });
-    } catch (error) {
-        logger.error('Failed to notify students', {
-            error: error.message,
-            courseId,
-            assignmentId,
-        });
-        throw error;
+class NotificationService extends BaseService {
+    static async sendKafkaMessage(topic, message) {
+        return await this.handleServiceCall(async () => {
+            const producer = kafka.producer();
+            await producer.connect();
+            await producer.send({
+                topic,
+                messages: [{ value: JSON.stringify(message) }],
+            });
+            await producer.disconnect();
+            logger.info('Kafka message sent', { topic, ...message });
+        }, `Failed to send message to topic: ${topic}`);
     }
-};
 
-exports.notifySubmissionCompleted = async (courseId, quizId, submissionId) => {
-    try {
-        await send({
-            topic: 'Submission-Completed',
-            messages: [
-                { value: JSON.stringify({ courseId, quizId, submissionId }) },
-            ],
-        });
-        logger.info('Submission completion notification sent', {
+    static async notifyStudents(courseId, assessmentId, type) {
+        return await this.sendKafkaMessage('Assessment-Creation', {
             courseId,
+            assessmentId,
+            type,
+        });
+    }
+
+    static async notifySubmissionCompleted(
+        courseId,
+        assessmentId,
+        submissionId,
+        type
+    ) {
+        return await this.sendKafkaMessage('Submission-Completed', {
+            courseId,
+            assessmentId,
+            submissionId,
+            type,
+        });
+    }
+
+    static async notifyGradingCompleted(quizId, submissionId) {
+        return await this.sendKafkaMessage('Grading-Completed', {
             quizId,
             submissionId,
         });
-    } catch (error) {
-        logger.error('Failed to notify submission completion', {
-            error: error.message,
-        });
-        throw error;
     }
-};
 
-exports.notifyGradingCompleted = async (quizId, submissionId) => {
-    const message = {
-        topic: 'Grading-Completed',
-        messages: [{ value: JSON.stringify({ quizId, submissionId }) }],
-    };
-    try {
-        await send(message);
-        logger.info('Grading completion notification sent', {
-            quizId,
-            submissionId,
-        });
-    } catch (error) {
-        logger.error('Failed to notify grading completion', {
-            error: error.message,
-        });
-        throw error;
-    }
-};
-
-exports.notifyAssignmentSubmissionCompleted = async (
-    courseId,
-    assignmentId,
-    submissionId
-) => {
-    const message = {
-        topic: 'AssignmentSubmitted',
-        messages: [
-            { value: JSON.stringify({ courseId, assignmentId, submissionId }) },
-        ],
-    };
-    try {
-        await send(message);
-        logger.info('Assignment submission completion notification sent', {
+    static async notifyAssignmentSubmissionCompleted(
+        courseId,
+        assignmentId,
+        submissionId
+    ) {
+        return await this.sendKafkaMessage('Assignment-Submitted', {
             courseId,
             assignmentId,
             submissionId,
         });
-    } catch (error) {
-        logger.error('Failed to notify assignment submission completion', {
-            error: error.message,
-        });
-        throw error;
     }
-};
 
-exports.notifyAssignmentGradingCompleted = async (
-    assignmentId,
-    submissionId
-) => {
-    const message = {
-        topic: 'Grading-Completed',
-        messages: [{ value: JSON.stringify({ assignmentId, submissionId }) }],
-    };
-    try {
-        await send(message);
-        logger.info('Assignment grading completion notification sent', {
+    static async notifyAssignmentGradingCompleted(assignmentId, submissionId) {
+        return await this.sendKafkaMessage('Grading-Completed', {
             assignmentId,
             submissionId,
         });
-    } catch (error) {
-        logger.error('Failed to notify assignment grading completion', {
-            error: error.message,
-        });
-        throw error;
     }
-};
+}
+
+module.exports = NotificationService;

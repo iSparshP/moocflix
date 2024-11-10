@@ -9,12 +9,6 @@ const config = {
             : [],
         clientId: 'user-management-service',
         groupId: 'user-management-group',
-        ssl: true,
-        sasl: {
-            mechanism: 'plain',
-            username: process.env.KAFKA_USERNAME,
-            password: process.env.KAFKA_PASSWORD,
-        },
         connectionTimeout: 5000,
         authenticationTimeout: 10000,
     },

@@ -1,3 +1,9 @@
+/**
+ * @typedef {Object} ValidationRule
+ * @property {string} field - The field to validate
+ * @property {string[]} rules - Array of validation rules
+ */
+
 const { body, param, validationResult } = require('express-validator');
 const {
     commonValidations,

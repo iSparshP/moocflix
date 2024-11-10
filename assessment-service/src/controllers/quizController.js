@@ -1,5 +1,8 @@
 // src/controllers/quizController.js
-const { validateCourseId } = require('../services/courseService');
+const { BaseController } = require('./baseController');
+const { validateQuiz } = require('../utils/validationSchemas');
+const { logger } = require('../config/logger');
+const { kafkaProducer } = require('../config/kafka');
 const {
     saveQuiz,
     fetchQuizzes,
@@ -12,177 +15,125 @@ const {
     gradeQuizSubmission,
 } = require('../services/quizService');
 const {
-    notifyStudents,
     notifySubmissionCompleted,
     notifyGradingCompleted,
+    notifyStudents,
 } = require('../services/notificationService');
+const { validateCourseId } = require('../services/courseService');
+const { ValidationError } = require('../utils/errorHandler');
 
-exports.createQuiz = async (req, res) => {
-    const { courseId } = req.params;
-    const quizData = req.body;
+class QuizController extends BaseController {
+    static async createQuiz(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId } = req.params;
+            const quizData = req.body;
 
-    try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
+            const { error } = validateQuiz(quizData);
+            if (error) {
+                throw new ValidationError(error.details[0].message);
+            }
 
-        // Save quiz data
-        const quizId = await saveQuiz(courseId, quizData);
+            await validateCourseId(courseId);
+            const quizId = await saveQuiz(courseId, quizData);
+            await notifyStudents(courseId, quizId);
 
-        // Notify students
-        await notifyStudents(courseId, quizId);
-
-        res.status(201).json({ message: 'Quiz created successfully', quizId });
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            return { quizId };
         });
     }
-};
 
-exports.getQuizzes = async (req, res) => {
-    const { courseId } = req.params;
+    static async getQuizzes(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId } = req.params;
 
-    try {
-        // Validate courseId
-        const isValidCourse = await validateCourseId(courseId);
-        if (!isValidCourse) {
-            return res.status(400).json({ message: 'Invalid course ID' });
-        }
+            await validateCourseId(courseId);
+            const quizzes = await fetchQuizzes(courseId);
 
-        // Fetch quizzes
-        const quizzes = await fetchQuizzes(courseId);
-        res.status(200).json(quizzes);
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            return quizzes;
         });
     }
-};
 
-exports.submitQuiz = async (req, res, next) => {
-    try {
-        const { courseId, quizId } = req.params;
-        const submissionData = req.body;
+    static async submitQuiz(req, res, next) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, quizId } = req.params;
+            const submissionData = req.body;
 
-        const submissionId = await submitQuizAnswers(
-            courseId,
-            quizId,
-            submissionData
-        );
+            const submissionId = await submitQuizAnswers(
+                courseId,
+                quizId,
+                submissionData
+            );
+            await notifySubmissionCompleted(courseId, quizId, submissionId);
 
-        await notifySubmissionCompleted(courseId, quizId, submissionId);
-
-        res.status(201).json({
-            status: 'success',
-            message: 'Quiz submitted successfully',
-            data: { submissionId },
-        });
-    } catch (error) {
-        next(error); // Pass to error handler
-    }
-};
-
-exports.getQuizResults = async (req, res) => {
-    const { courseId, quizId } = req.params;
-
-    try {
-        // Fetch quiz results
-        const results = await fetchQuizResults(courseId, quizId);
-        res.status(200).json(results);
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            return { submissionId };
         });
     }
-};
 
-exports.getQuizSubmissions = async (req, res) => {
-    const { courseId, quizId } = req.params;
+    static async getQuizResults(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, quizId } = req.params;
 
-    try {
-        // Fetch quiz submissions
-        const submissions = await fetchQuizSubmissions(courseId, quizId);
-        res.status(200).json(submissions);
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            const results = await fetchQuizResults(courseId, quizId);
+
+            return results;
         });
     }
-};
 
-exports.getSubmissionDetails = async (req, res) => {
-    const { courseId, quizId, submissionId } = req.params;
+    static async getQuizSubmissions(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, quizId } = req.params;
 
-    try {
-        // Fetch submission details
-        const submission = await fetchSubmissionDetails(
-            courseId,
-            quizId,
-            submissionId
-        );
-        res.status(200).json(submission);
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            const submissions = await fetchQuizSubmissions(courseId, quizId);
+
+            return submissions;
         });
     }
-};
 
-exports.deleteQuiz = async (req, res) => {
-    const { courseId, quizId } = req.params;
+    static async getSubmissionDetails(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, quizId, submissionId } = req.params;
 
-    try {
-        // Remove quiz
-        await removeQuiz(courseId, quizId);
-        res.status(200).json({ message: 'Quiz deleted successfully' });
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            const submission = await fetchSubmissionDetails(
+                courseId,
+                quizId,
+                submissionId
+            );
+
+            return submission;
         });
     }
-};
 
-exports.updateQuiz = async (req, res) => {
-    const { courseId, quizId } = req.params;
-    const quizData = req.body;
+    static async deleteQuiz(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, quizId } = req.params;
 
-    try {
-        // Update quiz data
-        await modifyQuiz(courseId, quizId, quizData);
-        res.status(200).json({ message: 'Quiz updated successfully' });
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            await removeQuiz(courseId, quizId);
+
+            return { message: 'Quiz deleted successfully' };
         });
     }
-};
 
-exports.gradeQuiz = async (req, res) => {
-    const { quizId } = req.params;
-    const { submissionId, grade } = req.body;
+    static async updateQuiz(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { courseId, quizId } = req.params;
+            const quizData = req.body;
 
-    try {
-        // Grade quiz submission
-        await gradeQuizSubmission(quizId, submissionId, grade);
+            await modifyQuiz(courseId, quizId, quizData);
 
-        // Notify grading completed
-        await notifyGradingCompleted(quizId, submissionId);
-
-        res.status(200).json({ message: 'Quiz graded successfully' });
-    } catch (error) {
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error.message,
+            return { message: 'Quiz updated successfully' };
         });
     }
-};
+
+    static async gradeQuiz(req, res) {
+        await this.handleRequest(req, res, async (req) => {
+            const { quizId } = req.params;
+            const { submissionId, grade } = req.body;
+
+            await gradeQuizSubmission(quizId, submissionId, grade);
+            await notifyGradingCompleted(quizId, submissionId);
+
+            return { message: 'Quiz graded successfully' };
+        });
+    }
+}
+
+module.exports = { QuizController };

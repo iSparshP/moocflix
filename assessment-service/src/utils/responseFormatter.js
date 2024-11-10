@@ -1,21 +1,24 @@
 class ResponseFormatter {
-    static success(data = null, message = 'Success') {
+    static success(data, message = 'Success') {
         return {
             status: 'success',
-            message,
             data,
+            message,
         };
     }
 
-    static error(message = 'Error occurred', errors = null) {
+    static error(message, code = 'INTERNAL_ERROR', status = 500) {
         return {
             status: 'error',
-            message,
-            errors,
+            error: {
+                message,
+                code,
+            },
+            statusCode: status,
         };
     }
 
-    static paginated(data, page, limit, total) {
+    static paginate(data, page, limit, total) {
         return {
             status: 'success',
             data,

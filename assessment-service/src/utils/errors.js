@@ -1,38 +1,35 @@
-// src/utils/errors.js
-class BaseError extends Error {
-    constructor(message, statusCode = 500, status = 'error') {
-        super(message);
-        this.statusCode = statusCode;
-        this.status = status;
-        this.name = this.constructor.name;
-        Error.captureStackTrace(this, this.constructor);
+const BaseError = require('../utils/errors/BaseError');
+const { logger } = require('../config/logger');
+
+class BaseService {
+    static async handleServiceCall(serviceCall, errorMessage) {
+        try {
+            return await serviceCall();
+        } catch (error) {
+            logger.error(errorMessage, {
+                error: error.message,
+                stack: error.stack,
+                service: this.constructor.name,
+            });
+            throw error instanceof BaseError
+                ? error
+                : new BaseError(errorMessage, 500);
+        }
+    }
+
+    static validateId(id, type) {
+        if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+            throw new BaseError(`Invalid ${type} ID`, 400);
+        }
+    }
+
+    static async validateExists(Model, id, type) {
+        const doc = await Model.findById(id);
+        if (!doc) {
+            throw new BaseError(`${type} not found`, 404);
+        }
+        return doc;
     }
 }
 
-class ServiceError extends BaseError {
-    constructor(service, message) {
-        super(`${service} Service Error: ${message}`, 503);
-        this.name = 'ServiceError';
-    }
-}
-
-class NotFoundError extends BaseError {
-    constructor(message) {
-        super(message, 404, 'fail');
-        this.name = 'NotFoundError';
-    }
-}
-
-class ValidationError extends BaseError {
-    constructor(message) {
-        super(message, 400, 'fail');
-        this.name = 'ValidationError';
-    }
-}
-
-module.exports = {
-    BaseError,
-    ServiceError,
-    NotFoundError,
-    ValidationError,
-};
+module.exports = BaseService;

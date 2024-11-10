@@ -9,12 +9,27 @@ const { retryConnection } = require('../src/utils/connectionRetry');
 const { createBreaker } = require('../src/utils/circuitBreaker');
 const { validateEventMessage } = require('../src/config/eventSchemas');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs');
+
+// Helper to read cert files
+const readCertFile = (filename) => {
+    return fs.readFileSync(
+        path.join(__dirname, '..', 'certs', filename),
+        'utf-8'
+    );
+};
 
 // Centralized Kafka configuration
 const kafka = new Kafka({
     clientId: config.kafka.clientId,
     brokers: config.kafka.brokers,
-    ssl: true,
+    ssl: {
+        rejectUnauthorized: true,
+        ca: [readCertFile('../certs/ca-certificate.crt')],
+        key: readCertFile('../certs/user-access-key.key'),
+        cert: readCertFile('../certs/user-access-certificate.crt'),
+    },
     sasl: {
         mechanism: 'plain',
         username: process.env.KAFKA_USERNAME,
@@ -24,7 +39,7 @@ const kafka = new Kafka({
     authenticationTimeout: config.kafka.authenticationTimeout,
     retry: {
         initialRetryTime: 100,
-        retries: 5,
+        retries: 8,
     },
 });
 

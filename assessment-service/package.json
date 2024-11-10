@@ -11,15 +11,19 @@
     "license": "ISC",
     "dependencies": {
         "axios": "^1.7.7",
+        "cors": "^2.8.5",
         "dotenv": "^16.4.5",
         "express": "^4.21.1",
         "express-rate-limit": "^7.1.5",
         "express-validator": "^7.2.0",
+        "helmet": "^8.0.0",
+        "joi": "^17.13.3",
         "jsonwebtoken": "^9.0.0",
         "kafkajs": "^2.2.4",
         "mongoose": "^8.7.1",
         "swagger-jsdoc": "^6.2.8",
         "swagger-ui-express": "^5.0.1",
+        "uuid": "^11.0.2",
         "winston": "^3.11.0",
         "winston-daily-rotate-file": "^5.0.0"
     }

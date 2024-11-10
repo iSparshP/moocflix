@@ -1,0 +1,45 @@
+services:
+  api:
+    container_name: assessment-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - MONGODB_URI=${MONGODB_URI}
+      # Kafka environment variables
+      - KAFKA_CLIENT_ID=${KAFKA_CLIENT_ID}
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_CONSUMER_GROUP_ID=${KAFKA_CONSUMER_GROUP_ID}
+      - KAFKA_SSL_CA_LOCATION=/usr/src/app/certs/ca-certificate.crt
+      - KAFKA_SSL_KEY_LOCATION=/usr/src/app/certs/user-access-key.key
+      - KAFKA_SSL_CERT_LOCATION=/usr/src/app/certs/user-access-certificate.crt
+      - KAFKA_SASL_USERNAME=${KAFKA_SASL_USERNAME}
+      - KAFKA_SASL_PASSWORD=${KAFKA_SASL_PASSWORD}
+      - KAFKA_HOST=moocflix-kafka-do-user-18048795-0.e.db.ondigitalocean.com
+      - KAFKA_PORT=25062
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+      - ./certs:/usr/src/app/certs:ro
+      - assessment_logs:/usr/src/app/logs
+    networks:
+      - moocflix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  moocflix-network:
+    external: true 
+
+volumes:
+  assessment_logs:
+    name: assessment-service-logs

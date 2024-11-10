@@ -1,26 +1,40 @@
+const { logger } = require('../config/logger');
+const { AppError } = require('./errors');
+
 class ErrorHandler {
-    static async handleServiceOperation(operation, errorMessage) {
-        try {
-            return await operation();
-        } catch (error) {
-            throw new Error(`${errorMessage}: ${error.message}`);
-        }
-    }
-
-    static handleValidationError(res, error) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'Validation failed',
-            errors: error.array(),
-        });
-    }
-
-    static handleServiceError(res, error) {
-        const status = error.statusCode || 500;
-        return res.status(status).json({
-            status: 'error',
+    static handleError(error, req, res) {
+        logger.error('Error:', {
             message: error.message,
+            stack: error.stack,
+            path: req.path,
+            method: req.method,
+            correlationId: req.correlationId,
         });
+
+        if (error instanceof AppError) {
+            return this.handleResponse(res, {
+                status: error.statusCode,
+                error: error.message,
+                code: error.code,
+            });
+        }
+
+        return this.handleResponse(res, {
+            status: 500,
+            error: 'Internal server error',
+        });
+    }
+
+    static handleResponse(res, { status = 200, data, error, message, code }) {
+        const response = {
+            status: error ? 'error' : 'success',
+            ...(data && { data }),
+            ...(error && { error }),
+            ...(message && { message }),
+            ...(code && { code }),
+        };
+
+        return res.status(status).json(response);
     }
 }
 

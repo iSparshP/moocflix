@@ -4,7 +4,34 @@ const {
     submitAssignment,
     getAssignmentResult,
     gradeAssignment,
+    getAssignments,
+    updateAssignment,
+    deleteAssignment,
 } = require('../controllers/assignmentController');
+
+// Add validation to ensure handlers exist
+const validateHandlers = () => {
+    const handlers = {
+        createAssignment,
+        submitAssignment,
+        getAssignmentResult,
+        gradeAssignment,
+        getAssignments,
+        updateAssignment,
+        deleteAssignment,
+    };
+
+    Object.entries(handlers).forEach(([name, handler]) => {
+        if (!handler) {
+            throw new Error(
+                `Handler '${name}' is not defined in assignmentController`
+            );
+        }
+    });
+};
+
+validateHandlers();
+
 const {
     validateRequest,
     validateAssignmentCreation,
@@ -62,7 +89,9 @@ router.post(
     writeLimiter,
     validateAssignmentCreation,
     validateRequest,
-    createAssignment
+    createAssignment ||
+        ((req, res) =>
+            res.status(500).json({ error: 'Handler not implemented' }))
 );
 
 /**
@@ -110,7 +139,9 @@ router.post(
     submissionLimiter,
     validateAssignmentSubmission,
     validateRequest,
-    submitAssignment
+    submitAssignment ||
+        ((req, res) =>
+            res.status(500).json({ error: 'Handler not implemented' }))
 );
 
 /**
@@ -150,7 +181,9 @@ router.get(
     '/api/v1/assessments/:courseId/assignment/:assignmentId/result',
     apiLimiter,
     validateRequest,
-    getAssignmentResult
+    getAssignmentResult ||
+        ((req, res) =>
+            res.status(500).json({ error: 'Handler not implemented' }))
 );
 
 /**
@@ -206,7 +239,107 @@ router.post(
     sensitiveOpLimiter,
     validateGrading,
     validateRequest,
-    gradeAssignment
+    gradeAssignment ||
+        ((req, res) =>
+            res.status(500).json({ error: 'Handler not implemented' }))
+);
+
+/**
+ * @swagger
+ * /api/v1/assessments/{courseId}/assignments:
+ *   get:
+ *     summary: Get all assignments for a course
+ *     tags: [Assignment]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of assignments
+ */
+router.get(
+    '/api/v1/assessments/:courseId/assignments',
+    apiLimiter,
+    validateRequest,
+    getAssignments ||
+        ((req, res) =>
+            res.status(500).json({ error: 'Handler not implemented' }))
+);
+
+/**
+ * @swagger
+ * /api/v1/assessments/{courseId}/assignment/{assignmentId}:
+ *   put:
+ *     summary: Update an assignment
+ *     tags: [Assignment]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Assignment'
+ *     responses:
+ *       200:
+ *         description: Assignment updated successfully
+ */
+router.put(
+    '/api/v1/assessments/:courseId/assignment/:assignmentId',
+    writeLimiter,
+    validateAssignmentCreation,
+    validateRequest,
+    updateAssignment ||
+        ((req, res) =>
+            res.status(500).json({ error: 'Handler not implemented' }))
+);
+
+/**
+ * @swagger
+ * /api/v1/assessments/{courseId}/assignment/{assignmentId}:
+ *   delete:
+ *     summary: Delete an assignment
+ *     tags: [Assignment]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Assignment deleted successfully
+ */
+router.delete(
+    '/api/v1/assessments/:courseId/assignment/:assignmentId',
+    writeLimiter,
+    validateRequest,
+    deleteAssignment ||
+        ((req, res) =>
+            res.status(500).json({ error: 'Handler not implemented' }))
 );
 
 module.exports = router;

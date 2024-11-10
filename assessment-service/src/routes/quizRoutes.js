@@ -1,15 +1,17 @@
 // src/routes/quizRoutes.js
 const express = require('express');
 const {
-    createQuiz,
-    getQuizzes,
-    submitQuiz,
-    getQuizResults,
-    getQuizSubmissions,
-    getSubmissionDetails,
-    deleteQuiz,
-    updateQuiz,
-    gradeQuiz,
+    QuizController: {
+        createQuiz,
+        getQuizzes,
+        submitQuiz,
+        getQuizResults,
+        getQuizSubmissions,
+        getSubmissionDetails,
+        deleteQuiz,
+        updateQuiz,
+        gradeQuiz,
+    },
 } = require('../controllers/quizController');
 const {
     validateRequest,

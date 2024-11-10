@@ -1,25 +1,27 @@
 const mongoose = require('mongoose');
-const logger = require('./logger');
+const { logger } = require('./logger');
 
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
+        const mongoURI = process.env.MONGODB_URI;
+
+        if (!mongoURI) {
+            throw new Error(
+                'MongoDB URI is not defined in environment variables'
+            );
+        }
+
+        const conn = await mongoose.connect(mongoURI, {
+            // Remove deprecated options
+            // useNewUrlParser and useUnifiedTopology are no longer needed in newer versions
         });
-        logger.info('MongoDB connected successfully');
+
+        logger.info(`MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {
         logger.error('MongoDB connection error:', error);
-        process.exit(1);
+        // Don't exit the process here, let the caller handle it
+        throw error;
     }
 };
 
-mongoose.connection.on('disconnected', () => {
-    logger.warn('MongoDB disconnected');
-});
-
-mongoose.connection.on('error', (error) => {
-    logger.error('MongoDB error:', error);
-});
-
-module.exports = connectDB;
+module.exports = { connectDB };

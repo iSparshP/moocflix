@@ -1,50 +1,64 @@
 // src/services/gradingService.js
+const BaseService = require('./baseService');
 const { Quiz } = require('../models/quizModel');
 const { Submission } = require('../models/submissionModel');
+const { NotFoundError, ValidationError } = require('../utils/errors');
+const { logger } = require('../config/logger');
 
-exports.autoGradeQuiz = async (quizId, submissionId, answers) => {
-    try {
-        // Fetch quiz and submission
-        const [quiz, submission] = await Promise.all([
-            Quiz.findById(quizId),
-            Submission.findById(submissionId),
-        ]);
+class GradingService extends BaseService {
+    static async autoGradeQuiz(quizId, submissionId, answers) {
+        return await this.handleServiceCall(async () => {
+            const [quiz, submission] = await Promise.all([
+                Quiz.findById(quizId),
+                Submission.findById(submissionId),
+            ]);
 
-        if (!quiz || !submission) {
-            throw new Error('Quiz or submission not found');
-        }
-
-        // Calculate score
-        let score = 0;
-        const totalQuestions = quiz.questions.length;
-
-        submission.answers.forEach((answer, index) => {
-            if (
-                quiz.questions[index] &&
-                quiz.questions[index].correctAnswer === answer.answer
-            ) {
-                score++;
+            if (!quiz || !submission) {
+                throw new NotFoundError('Quiz or submission not found');
             }
-        });
 
-        // Calculate percentage
-        const grade = (score / totalQuestions) * 100;
+            let score = 0;
+            const totalQuestions = quiz.questions.length;
+            const gradedAnswers = submission.answers.map((answer) => {
+                const question = quiz.questions.find(
+                    (q) => q._id.toString() === answer.questionId
+                );
+                if (!question) return answer;
 
-        // Update submission with grade
-        await Submission.updateOne({ _id: submissionId }, { $set: { grade } });
+                const isCorrect = question.correctAnswer === answer.answer;
+                score += isCorrect ? question.points : 0;
+                return {
+                    ...answer,
+                    isCorrect,
+                    points: isCorrect ? question.points : 0,
+                };
+            });
 
-        return grade;
-    } catch (error) {
-        throw new Error(`Auto-grading failed: ${error.message}`);
+            const grade = (score / quiz.totalPoints) * 100;
+            submission.answers = gradedAnswers;
+            submission.grade = grade;
+            submission.status = 'graded';
+            submission.gradedAt = new Date();
+            await submission.save();
+
+            logger.info('Quiz auto-graded', { quizId, submissionId, grade });
+            return grade;
+        }, 'Auto-grading failed');
     }
-};
 
-exports.validateAnswers = (questions, answers) => {
-    if (!Array.isArray(questions) || !Array.isArray(answers)) {
-        return false;
+    static validateAnswers(questions, answers) {
+        return this.handleServiceCall(() => {
+            if (!Array.isArray(questions) || !Array.isArray(answers)) {
+                throw new ValidationError(
+                    'Invalid questions or answers format'
+                );
+            }
+
+            return answers.every((answer) =>
+                questions.some((q) => q.id === answer.questionId)
+            );
+        }, 'Answer validation failed');
     }
+}
 
-    return answers.every((answer) =>
-        questions.some((q) => q.id === answer.questionId)
-    );
-};
+module.exports = GradingService;
