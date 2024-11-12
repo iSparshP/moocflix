@@ -3,37 +3,36 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 const config = require('./config/config');
-const contentRoutes = require('./routes/contentRoutes');
-const healthRoutes = require('./routes/healthRoutes');
-const errorHandler = require('./middlewares/errorHandler');
-const { sequelize, redisClient } = require('./config/db');
-const { initializeKafkaConsumer } = require('./services/kafkaHandler');
-const transcodingManager = require('./services/transcodingManager');
+const routes = require('./routes');
+const { errorHandler } = require('./middlewares');
+const { dbManager } = require('./config/db');
+const kafkaManager = require('./config/kafka');
+const metrics = require('./middlewares/metrics');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
-const { registerService } = require('./utils/serviceRegistry');
+const logger = require('./utils/logger');
 
 const initializeApp = async () => {
     try {
-        // Connect to Redis
-        await redisClient.connect();
+        // Initialize database connections
+        if (!dbManager || typeof dbManager.initialize !== 'function') {
+            throw new Error('Database manager is not properly initialized');
+        }
+        await dbManager.initialize();
+        logger.info('Database initialized successfully');
 
-        // Sync database
-        await sequelize.sync({ force: false });
-
-        // Initialize Kafka consumer
-        await initializeKafkaConsumer();
-
-        // Initialize transcoding manager
-        await transcodingManager.start();
+        // Initialize Kafka
+        if (!kafkaManager || typeof kafkaManager.initialize !== 'function') {
+            throw new Error('Kafka manager is not properly initialized');
+        }
+        await kafkaManager.initialize();
+        logger.info('Kafka initialized successfully');
 
         // Setup Express middleware
         app.use(express.json());
-
-        // Add security headers
         app.use(helmet());
 
         // Add rate limiting
@@ -42,18 +41,6 @@ const initializeApp = async () => {
             max: 100, // limit each IP to 100 requests per windowMs
         });
         app.use('/api/', limiter);
-
-        // Swagger documentation route
-        if (config.app.env === 'development') {
-            app.use(
-                '/api-docs',
-                swaggerUi.serve,
-                swaggerUi.setup(swaggerSpecs, {
-                    explorer: true,
-                    customCss: '.swagger-ui .topbar { display: none }',
-                })
-            );
-        }
 
         // Add CORS configuration
         app.use(
@@ -69,50 +56,78 @@ const initializeApp = async () => {
             })
         );
 
-        // Routes
-        app.use('/api/v1/content', contentRoutes);
-        app.use('/api/v1', healthRoutes);
+        // Add metrics endpoint
+        app.get('/metrics', metrics.getMetricsHandler());
 
-        // Error handler
+        // Swagger documentation route
+        if (config.app.env === 'development') {
+            app.use(
+                '/api-docs',
+                swaggerUi.serve,
+                swaggerUi.setup(swaggerSpecs, {
+                    explorer: true,
+                    customCss: '.swagger-ui .topbar { display: none }',
+                })
+            );
+        }
+
+        // Initialize routes
+        routes(app);
+
+        // Error handling middleware
         app.use(errorHandler);
 
-        // Register service with Consul
-        await registerService();
-        console.log('Service registered with Consul');
-
         // Start server
-        const port = process.env.PORT || 3006;
-        app.listen(port, () => {
-            console.log(`Content delivery service running on port ${port}`);
+        const server = app.listen(config.app.port, () => {
+            logger.info(
+                `Server running on port ${config.app.port} in ${config.app.env} mode`
+            );
         });
+
+        // Graceful shutdown
+        const shutdown = async (signal) => {
+            logger.info(`${signal} received. Starting graceful shutdown...`);
+            try {
+                // Close server first to stop accepting new requests
+                server.close(() => {
+                    logger.info('Server closed');
+                });
+
+                // Close other connections
+                await Promise.all([
+                    kafkaManager
+                        .close()
+                        .catch((err) =>
+                            logger.error('Error closing Kafka:', err)
+                        ),
+                    dbManager
+                        .close()
+                        .catch((err) => logger.error('Error closing DB:', err)),
+                ]);
+
+                logger.info('Graceful shutdown completed');
+                process.exit(0);
+            } catch (error) {
+                logger.error('Error during shutdown:', error);
+                process.exit(1);
+            }
+        };
+
+        // Handle shutdown signals
+        process.on('SIGTERM', () => shutdown('SIGTERM'));
+        process.on('SIGINT', () => shutdown('SIGINT'));
     } catch (error) {
-        console.error('Failed to initialize application:', error);
-        process.exit(1);
+        logger.error('Failed to initialize application:', error);
+        throw error;
     }
 };
 
-// Global error handler
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    process.exit(1);
-});
-
-// Add shutdown handler
-const shutdown = async () => {
-    console.log('Shutting down application...');
-    try {
-        await transcodingManager.stop();
-        await redisClient.quit();
-        await sequelize.close();
-        process.exit(0);
-    } catch (error) {
-        console.error('Error during shutdown:', error);
+// Start the application
+if (require.main === module) {
+    initializeApp().catch((error) => {
+        logger.error('Application startup failed:', error);
         process.exit(1);
-    }
-};
+    });
+}
 
-// Add shutdown handlers
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-
-initializeApp();
+module.exports = app; // Export for testing

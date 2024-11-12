@@ -1,33 +1,75 @@
 const Joi = require('joi');
 
-const schemas = {
-    // Video upload validation
-    uploadVideo: Joi.object({
-        courseId: Joi.string().uuid().required(),
+// Common validation patterns
+const patterns = {
+    uuid: Joi.string().uuid(),
+    quality: Joi.string().valid('480p', '720p', '1080p'),
+    format: Joi.string().valid('mp4', 'hls'),
+};
+
+// Video-related schemas
+const videoSchemas = {
+    upload: Joi.object({
+        courseId: patterns.uuid.required(),
         title: Joi.string().min(3).max(255).required(),
         description: Joi.string().max(1000).optional(),
+        quality: patterns.quality.default('720p'),
+        format: patterns.format.default('mp4'),
     }),
 
-    // Video ID parameter validation
-    videoId: Joi.object({
-        videoId: Joi.string().uuid().required(),
-    }),
+    params: {
+        videoId: Joi.object({
+            videoId: patterns.uuid.required(),
+        }),
+    },
 
-    // Course ID parameter validation
-    courseId: Joi.object({
-        courseId: Joi.string().uuid().required(),
-    }),
+    query: {
+        streaming: Joi.object({
+            quality: patterns.quality.default('720p'),
+            format: patterns.format.default('hls'),
+        }),
+    },
 
-    // Enrollment validation
-    enrollment: Joi.object({
-        studentId: Joi.string().uuid().required(),
-    }),
-
-    // Transcoding request validation
     transcoding: Joi.object({
-        format: Joi.string().valid('mp4', 'hls').default('mp4'),
-        quality: Joi.string().valid('720p', '1080p', '480p').default('720p'),
+        format: patterns.format.default('mp4'),
+        quality: patterns.quality.default('720p'),
+        generateThumbnails: Joi.boolean().default(true),
     }),
 };
 
-module.exports = schemas;
+// Course-related schemas
+const courseSchemas = {
+    params: {
+        courseId: Joi.object({
+            courseId: patterns.uuid.required(),
+        }),
+    },
+};
+
+// Enrollment-related schemas
+const enrollmentSchemas = {
+    create: Joi.object({
+        studentId: patterns.uuid.required(),
+        courseId: patterns.uuid.required(),
+    }),
+};
+
+// File validation schemas
+const fileSchemas = {
+    video: Joi.object({
+        mimetype: Joi.string()
+            .valid('video/mp4', 'video/mkv', 'video/avi')
+            .required(),
+        size: Joi.number()
+            .max(100 * 1024 * 1024)
+            .required(), // 100MB limit
+    }),
+};
+
+module.exports = {
+    video: videoSchemas,
+    course: courseSchemas,
+    enrollment: enrollmentSchemas,
+    file: fileSchemas,
+    patterns,
+};

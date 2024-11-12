@@ -23,7 +23,7 @@ Checks if the service is ready to accept requests.
 
 ## Service Information
 
-- **Port:** 3010
+- **Port:** 3006
 - **Default Replicas:** 3
 
 ## Resource Specifications
@@ -37,13 +37,13 @@ The service is configured with the following resource limits:
 
 | Variable | Description | Default Value |
 |----------|-------------|---------------|
-| PORT     | Service port | 3010         |
+| PORT     | Service port | 3006         |
 
 ## Notes for Frontend Developers
 
 1. **Base URL Configuration**
    - Always use the base URL prefix `/api/v1` for all API calls
-   - For local development, the full URL would be: `http://localhost:3010/api/v1`
+   - For local development, the full URL would be: `http://localhost:3006/api/v1`
 
 2. **Health Checks**
    - The health check endpoints can be used to verify service availability
@@ -64,7 +64,7 @@ The Content Delivery Service is deployed as a Kubernetes service with:
 - High availability (3 replicas)
 - Resource limits to ensure stable performance
 - Health checks for reliability
-- Container port exposure on 3010
+- Container port exposure on 3006
 
 ## Need Help?
 

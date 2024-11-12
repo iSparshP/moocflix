@@ -1,33 +1,72 @@
-const kafka = require('kafka-node');
-const Producer = kafka.Producer;
-const client = new kafka.KafkaClient({ kafkaHost: process.env.KAFKA_HOST });
-const producer = new Producer(client);
+const { Kafka } = require('kafkajs');
+const config = require('../config/config');
 
-producer.on('ready', () => {
-    console.log('Kafka Producer is connected and ready.');
-});
-
-producer.on('error', (err) => {
-    console.error('Kafka Producer error:', err);
-});
-
-exports.sendMessage = (topic, message) => {
-    return new Promise((resolve, reject) => {
-        const payloads = [
-            {
-                topic: topic,
-                messages: JSON.stringify(message),
+class KafkaClient {
+    constructor() {
+        this.kafka = new Kafka({
+            clientId: config.kafka.clientId,
+            brokers: config.kafka.brokers,
+            ssl: true,
+            sasl: {
+                mechanism: 'plain',
+                username: config.kafka.username,
+                password: config.kafka.password,
             },
-        ];
-
-        producer.send(payloads, (err, data) => {
-            if (err) {
-                console.error('Error sending message to Kafka:', err);
-                reject(err);
-            } else {
-                console.log('Message sent to Kafka:', data);
-                resolve(data);
-            }
         });
-    });
-};
+
+        this.producer = null;
+        this.consumer = null;
+        this._isInitialized = false;
+    }
+
+    async initialize() {
+        try {
+            this.producer = this.kafka.producer();
+            await this.producer.connect();
+
+            this.consumer = this.kafka.consumer({
+                groupId: config.kafka.groupId,
+            });
+            await this.consumer.connect();
+
+            this._isInitialized = true;
+            return true;
+        } catch (error) {
+            console.error('Failed to initialize Kafka:', error);
+            this._isInitialized = false;
+            throw error;
+        }
+    }
+
+    async disconnect() {
+        try {
+            if (this.producer) {
+                await this.producer.disconnect();
+            }
+            if (this.consumer) {
+                await this.consumer.disconnect();
+            }
+            this._isInitialized = false;
+        } catch (error) {
+            console.error('Error disconnecting from Kafka:', error);
+            throw error;
+        }
+    }
+
+    async isConnected() {
+        try {
+            if (!this._isInitialized || !this.producer) {
+                return false;
+            }
+            // Try a simple admin operation to verify connection
+            await this.producer
+                .send({ topic: '__kafka_ready_check', messages: [] })
+                .catch(() => {});
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+}
+
+module.exports = new KafkaClient();

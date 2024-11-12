@@ -65,7 +65,7 @@ const { getBreaker } = require('../utils/circuitBreaker');
  *       503:
  *         description: Service is unhealthy
  */
-router.get('/health', async (req, res) => {
+router.get('/', async (req, res) => {
     const health = {
         uptime: process.uptime(),
         timestamp: Date.now(),
@@ -109,7 +109,7 @@ router.get('/health', async (req, res) => {
 
         // Check Kafka
         const kafkaStart = Date.now();
-        const kafkaStatus = await kafka.producer.isConnected();
+        const kafkaStatus = await kafka.isConnected();
         health.services.kafka = {
             status: kafkaStatus ? 'healthy' : 'unhealthy',
             latency: Date.now() - kafkaStart,
@@ -127,16 +127,16 @@ router.get('/health', async (req, res) => {
 });
 
 // Add more detailed health checks
-router.get('/health/liveness', (req, res) => {
+router.get('/liveness', (req, res) => {
     res.status(200).json({ status: 'alive' });
 });
 
-router.get('/health/readiness', async (req, res) => {
+router.get('/readiness', async (req, res) => {
     try {
         await Promise.all([
             dbManager.sequelize.authenticate(),
             dbManager.redisClient.ping(),
-            kafka.producer.isConnected(),
+            kafka.isConnected(),
         ]);
         res.status(200).json({ status: 'ready' });
     } catch (error) {

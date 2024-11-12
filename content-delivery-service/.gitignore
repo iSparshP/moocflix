@@ -9,3 +9,9 @@
 .env.test.local
 .env.production.local   
 /certs
+
+# Certificates
+certs/*
+!certs/.gitkeep
+/certs
+/src/certs

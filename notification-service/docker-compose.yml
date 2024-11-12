@@ -39,6 +39,5 @@ services:
         max-file: "3"
 
 networks:
-  default:
-    name: notification-network
-    driver: bridge
+  moocflix-network:
+    external: true

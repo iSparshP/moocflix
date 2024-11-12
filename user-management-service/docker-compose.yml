@@ -3,6 +3,7 @@ version: '3.8'
 services:
   app:
     build: .
+    container_name: user-management-service
     ports:
       - "3007:3007"
     env_file:
@@ -13,4 +14,11 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3007
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3003
+    networks:
+      - moocflix-network
     command: npm start
+
+networks:
+  moocflix-network:
+    external: true

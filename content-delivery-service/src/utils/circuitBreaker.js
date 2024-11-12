@@ -1,47 +1,42 @@
 const CircuitBreaker = require('opossum');
 
 const defaultOptions = {
-    timeout: 3000, // Time in ms before request is considered failed
-    errorThresholdPercentage: 50, // Error rate % at which to open circuit
-    resetTimeout: 30000, // Time in ms to wait before attempting reset
-    volumeThreshold: 10, // Minimum requests needed before tripping circuit
+    timeout: 3000, // Time in milliseconds to wait for action to complete
+    errorThresholdPercentage: 50, // Error percentage at which to open circuit
+    resetTimeout: 30000, // Time in milliseconds to wait before testing circuit
+    rollingCountTimeout: 10000, // Sets the duration of the statistical rolling window
+    volumeThreshold: 10, // Minimum number of requests within the rolling window
 };
 
 const breakers = new Map();
 
-function createBreaker(name, fn, options = {}) {
-    const breaker = new CircuitBreaker(fn, {
+const createBreaker = (action, name, options = {}) => {
+    if (typeof action !== 'function') {
+        throw new Error(
+            `Circuit breaker '${name}' requires a function as an action`
+        );
+    }
+
+    const breaker = new CircuitBreaker(action, {
         ...defaultOptions,
         ...options,
         name,
     });
 
-    // Add event listeners
-    breaker.on('open', () => {
-        console.warn(`Circuit Breaker '${name}' is now OPEN`);
-    });
-
-    breaker.on('halfOpen', () => {
-        console.info(`Circuit Breaker '${name}' is now HALF-OPEN`);
-    });
-
-    breaker.on('close', () => {
-        console.info(`Circuit Breaker '${name}' is now CLOSED`);
-    });
-
-    breaker.on('reject', () => {
-        console.warn(`Circuit Breaker '${name}' rejected the request`);
-    });
-
     breakers.set(name, breaker);
     return breaker;
-}
+};
 
-function getBreaker(name) {
+const getBreaker = (name) => {
     return breakers.get(name);
-}
+};
+
+const getAllBreakers = () => {
+    return Array.from(breakers.values());
+};
 
 module.exports = {
     createBreaker,
     getBreaker,
+    getAllBreakers,
 };

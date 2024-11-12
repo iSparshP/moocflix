@@ -2,6 +2,7 @@
 const { consumeMessages } = require('../utils/kafka');
 const Video = require('../models/Video');
 const { redisClient } = require('../config/db');
+const config = require('../config/config');
 
 const handleIncomingMessage = async (topic, message) => {
     try {
@@ -10,7 +11,7 @@ const handleIncomingMessage = async (topic, message) => {
         }
 
         switch (topic) {
-            case 'Student-Enrolled':
+            case config.kafka.topics.studentEnrolled:
                 const { courseId, studentId } = message;
                 if (!courseId || !studentId) {
                     throw new Error('Invalid enrollment message format');
@@ -31,7 +32,7 @@ const handleIncomingMessage = async (topic, message) => {
                 );
                 break;
 
-            case 'Transcoding-Completed':
+            case config.kafka.topics.transcodeComplete:
                 const { videoId, transcodedUrl } = message;
                 if (!videoId || !transcodedUrl) {
                     throw new Error('Invalid transcoding completion message');
@@ -49,7 +50,7 @@ const handleIncomingMessage = async (topic, message) => {
                 await redisClient.del(`video:${videoId}`);
                 break;
 
-            case 'Transcoding-Progress':
+            case config.kafka.topics.transcodeProgress:
                 await Video.update(
                     {
                         transcoding_progress: message.progress,
@@ -59,7 +60,7 @@ const handleIncomingMessage = async (topic, message) => {
                 );
                 break;
 
-            case 'Transcoding-Failed':
+            case config.kafka.topics.transcodeFailed:
                 await Video.update(
                     {
                         status: 'failed',
@@ -94,10 +95,10 @@ const initializeKafkaConsumer = async () => {
         try {
             await consumeMessages(
                 [
-                    'Student-Enrolled',
-                    'Transcoding-Completed',
-                    'Transcoding-Progress',
-                    'Transcoding-Failed',
+                    config.kafka.topics.studentEnrolled,
+                    config.kafka.topics.transcodeComplete,
+                    config.kafka.topics.transcodeProgress,
+                    config.kafka.topics.transcodeFailed,
                 ],
                 handleIncomingMessage
             );

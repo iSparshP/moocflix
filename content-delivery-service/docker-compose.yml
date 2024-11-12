@@ -1,23 +1,35 @@
-version: '3.8'
-
 services:
   content-delivery:
-    build: .
-    container_name: content-delivery
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: content-delivery-service
     ports:
       - "3006:3006"
-    environment:
-      - NODE_ENV=production
-      - PORT=3006
+    env_file: .env
+    volumes:
+      - ./certs:/app/certs:ro
     networks:
-      - moocflix-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3006/api/v1/health/liveness"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
+      - content-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - NODE_ENV=${NODE_ENV}
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
 
 networks:
-  moocflix-network:
-    external: true 
+  content-network:
+    driver: bridge 
